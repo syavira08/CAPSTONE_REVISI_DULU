@@ -1,309 +1,194 @@
 package view;
 
 import controller.PromoController;
-import java.awt.BorderLayout;
-import java.util.ArrayList;
+import controller.ValidasiException;
 import java.util.List;
-import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 import model.Promo;
 
-/**
- * Flowchart Kelola Promo: 1. Lihat  2. Tambah  3. Ubah  4. Hapus.
- * Tampilan dari Form Builder (PromoPanel.form); form Tambah/Ubah ada di DialogPromo.
- */
+/** Kelola promo / voucher (admin). */
 public class PromoPanel extends javax.swing.JPanel implements Halaman {
 
     private final PromoController controller = new PromoController();
-    private final PagerPanel pager = new PagerPanel(8, "promo");
-    private final DefaultTableModel model;
-    private List<Promo> data = new ArrayList<>();
-    private List<Promo> tampil = new ArrayList<>();
+    private List<Promo> data = List.of();
 
     public PromoPanel() {
         initComponents();
-        model = (DefaultTableModel) tblPromo.getModel();
-        UI.tabel(tblPromo, scrPromo);
-        UI.kolomBadge(tblPromo, 5);
-        tblPromo.getColumnModel().getColumn(4).setPreferredWidth(200);
-        tblPromo.getColumnModel().getColumn(6).setPreferredWidth(230);
-        new KolomAksi(tblPromo, 6,
-                new KolomAksi.Tombol("Lihat", UI.Jenis.SEKUNDER, b -> true, this::lihat),
-                new KolomAksi.Tombol("Ubah", UI.Jenis.SEKUNDER, b -> true, this::ubah),
-                new KolomAksi.Tombol("Hapus", UI.Jenis.BAHAYA, b -> true, this::hapus));
-        UI.input(txtCari, "Cari kode voucher...");
-        UI.combo(cmbStatus);
-        UI.sekunder(btnTampilkan);
-        UI.primer(btnTambah);
-        UI.sorotan(pnlInfo, 10, 14, 10, 14);
-        UI.info(pnlInfo, lblInfo, lblInfo.getText());
-        pnlPager.add(pager, BorderLayout.CENTER);
-        pager.setAksi(this::tampilkanTabel);
-        UI.sembunyi(pnlPesan);
-        UI.tema(this);
+        Gaya.tabel(tblPromo);
+        Gaya.lebarKolom(tblPromo, 160, 130, 120, 100, 130, 130, 170);
+        KolomAksi.pasang(tblPromo, 6, b -> new String[]{"Ubah", "Hapus"}, (b, t) -> aksi(data.get(b), t));
     }
 
     @Override
     public void muat() {
-        coba(() -> {
-            data = controller.cari(txtCari.getText(), (String) cmbStatus.getSelectedItem());
-            tampilkanTabel();
-            if (data.isEmpty()) info("Belum ada data promo.");
-        });
-    }
-
-    private void tampilkanTabel() {
-        if (tblPromo.isEditing()) tblPromo.getCellEditor().cancelCellEditing();
-        tampil = new ArrayList<>(pager.potong(data));
+        data = controller.cari(txtCari.getText());
+        DefaultTableModel model = (DefaultTableModel) tblPromo.getModel();
         model.setRowCount(0);
-        for (Promo p : tampil) {
+        for (Promo p : data) {
             model.addRow(new Object[]{p.getKode(), p.getLabelJenis(), p.getTeksDiskon(), p.getMinimalBarang() + " barang",
-                    UI.tanggal(p.getMulai()) + " – " + UI.tanggal(p.getSelesai()), p.getStatus(), ""});
+                Gaya.tanggal(p.getMulai()), Gaya.tanggal(p.getSelesai()), ""});
         }
-        UI.sesuaikanTinggi(scrPromo, tblPromo);
+        lblJumlah.setText(data.size() + " promo ditampilkan");
     }
 
-    private void lihat(int baris) {
-        Promo p = tampil.get(baris);
-        UI.konfirmasi(this, "Detail Promo", "<b>" + p.getKode() + " • " + p.getStatus() + "</b><br><br>"
-                + "Jenis: " + p.getLabelJenis() + "<br>Potongan: " + p.getTeksDiskon()
-                + "<br>Minimal pembelian: " + p.getMinimalBarang() + " barang<br>Periode: "
-                + UI.tanggal(p.getMulai()) + " – " + UI.tanggal(p.getSelesai())
-                + "<br><br>Satu voucher per pesanan dan tidak dapat digabungkan.", "Tutup", false);
-    }
-
-    /** Form Tambah (lama = null) / Ubah promo. */
-    private void bukaForm(Promo lama) {
-        DialogPromo d = new DialogPromo(SwingUtilities.getWindowAncestor(this), lama);
-        d.setVisible(true);
-        if (d.isBerhasil()) {
-            muat();
-            sukses(lama == null ? "Promo berhasil disimpan" : "Promo berhasil diubah");
+    private void aksi(Promo p, String tombol) {
+        if (tombol.equals("Ubah")) {
+            if (PromoDialog.tampil(this, p)) NotifikasiDialog.tampil(this, "Promo berhasil diubah", p.getKode());
+        } else if (KonfirmasiDialog.tanya(this, "Hapus promo", "Yakin ingin menghapus voucher <b>" + p.getKode() + "</b>?",
+                "Hapus", "dialog_hapus", true)) {
+            try {
+                controller.hapus(p.getId());
+                NotifikasiDialog.tampil(this, "Promo dihapus", p.getKode());
+            } catch (ValidasiException e) {
+                KonfirmasiDialog.gagal(this, e.getMessage());
+            }
         }
+        muat();
     }
 
-    private void ubah(int baris) {
-        bukaForm(tampil.get(baris));
-    }
-
-    private void hapus(int baris) {
-        Promo p = tampil.get(baris);
-        if (UI.konfirmasi(this, "Hapus promo?", "Hapus voucher <b>" + p.getKode()
-                + "</b>? Pelanggan tidak dapat menggunakan voucher ini setelah dihapus.", "Ya, Hapus", true)
-                && coba(() -> controller.hapus(p.getId()))) {
-            muat();
-            sukses("Promo berhasil dihapus");
-        }
-    }
-
-    // ---------- pesan di dalam halaman (tanpa pop-up) ----------
-    private void sukses(String teks) { UI.pesan(pnlPesan, lblPesan, UI.Pesan.SUKSES, teks); }
-
-    private void galat(String teks) { UI.pesan(pnlPesan, lblPesan, UI.Pesan.GALAT, teks); }
-
-    private void info(String teks) { UI.pesan(pnlPesan, lblPesan, UI.Pesan.INFO, teks); }
-
-    @Override
-    public void bersihkanPesan() { UI.sembunyi(pnlPesan); }
-
-    /** Jalankan aksi; jika gagal, tampilkan pesannya. Mengembalikan true jika berhasil. */
-    private boolean coba(Runnable aksi) {
-        try {
-            aksi.run();
-            return true;
-        } catch (RuntimeException e) {
-            galat(e.getMessage());
-            return false;
-        }
-    }
-
+    /**
+     * Kode di bawah ini dibuat oleh GUI Form Builder NetBeans (jangan diubah manual).
+     */
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
         java.awt.GridBagConstraints gridBagConstraints;
 
-        pnlAtas = new javax.swing.JPanel();
         pnlKepala = new javax.swing.JPanel();
-        pnlJudul = new javax.swing.JPanel();
         lblJudul = new javax.swing.JLabel();
-        lblSubjudul = new javax.swing.JLabel();
-        pnlAksiKepala = new javax.swing.JPanel();
+        lblSub = new javax.swing.JLabel();
         btnTambah = new javax.swing.JButton();
-        pnlPesan = new javax.swing.JPanel();
-        lblPesan = new javax.swing.JLabel();
-        pnlIsi = new javax.swing.JPanel();
-        pnlKonten = new javax.swing.JPanel();
         pnlFilter = new javax.swing.JPanel();
-        pnlCari = new javax.swing.JPanel();
         lblCari = new javax.swing.JLabel();
         txtCari = new javax.swing.JTextField();
-        pnlStatus = new javax.swing.JPanel();
-        lblStatus = new javax.swing.JLabel();
-        cmbStatus = new javax.swing.JComboBox<>();
-        btnTampilkan = new javax.swing.JButton();
-        pnlIsiFilter = new javax.swing.JPanel();
+        btnCari = new javax.swing.JButton();
         scrPromo = new javax.swing.JScrollPane();
         tblPromo = new javax.swing.JTable();
-        pnlPager = new javax.swing.JPanel();
-        pnlInfo = new javax.swing.JPanel();
-        lblInfo = new javax.swing.JLabel();
+        lblJumlah = new javax.swing.JLabel();
 
-        setBackground(new java.awt.Color(243, 246, 250));
-        setBorder(javax.swing.BorderFactory.createEmptyBorder(28, 32, 32, 32));
+        setBackground(new java.awt.Color(245, 247, 251));
+        setBorder(javax.swing.BorderFactory.createEmptyBorder(24, 32, 24, 32));
         setLayout(new java.awt.BorderLayout());
 
-        pnlAtas.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 20, 0));
-        pnlAtas.setOpaque(false);
-        pnlAtas.setLayout(new java.awt.BorderLayout());
+        pnlKepala.setBackground(new java.awt.Color(255, 255, 255));
+        pnlKepala.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 16, 0));
         pnlKepala.setOpaque(false);
-        pnlKepala.setLayout(new java.awt.BorderLayout(12, 0));
-        pnlJudul.setOpaque(false);
-        pnlJudul.setLayout(new java.awt.BorderLayout(0, 6));
-        lblJudul.setFont(new java.awt.Font("Segoe UI", 1, 26));
-        lblJudul.setForeground(new java.awt.Color(23, 43, 77));
-        lblJudul.setText("Kelola promo");
-        pnlJudul.add(lblJudul, java.awt.BorderLayout.NORTH);
-        lblSubjudul.setFont(new java.awt.Font("Segoe UI", 0, 13));
-        lblSubjudul.setForeground(new java.awt.Color(94, 108, 132));
-        lblSubjudul.setText("Atur voucher dan periode penawaran untuk pelanggan.");
-        pnlJudul.add(lblSubjudul, java.awt.BorderLayout.CENTER);
-        pnlKepala.add(pnlJudul, java.awt.BorderLayout.CENTER);
-        pnlAksiKepala.setOpaque(false);
-        pnlAksiKepala.setLayout(new java.awt.BorderLayout());
-        btnTambah.setBackground(new java.awt.Color(33, 97, 213));
-        btnTambah.setFont(new java.awt.Font("Segoe UI", 1, 13));
-        btnTambah.setForeground(new java.awt.Color(255, 255, 255));
-        btnTambah.setText("+ Tambah Promo");
+        pnlKepala.setLayout(new java.awt.GridBagLayout());
+        lblJudul.setFont(new java.awt.Font("Segoe UI", 1, 22)); // NOI18N
+        lblJudul.setForeground(new java.awt.Color(16, 24, 40));
+        lblJudul.setText("Kelola Promo");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.weightx = 1.0;
+        pnlKepala.add(lblJudul, gridBagConstraints);
+        lblSub.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        lblSub.setForeground(new java.awt.Color(102, 112, 133));
+        lblSub.setText("Promo yang sedang berlaku tampil di Beranda pelanggan dan bisa dipilih saat checkout.");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(4, 0, 0, 0);
+        pnlKepala.add(lblSub, gridBagConstraints);
+        btnTambah.setBackground(new java.awt.Color(31, 94, 219));
+        btnTambah.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 16, 0, 16));
+        btnTambah.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         btnTambah.setFocusPainted(false);
+        btnTambah.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnTambah.setForeground(new java.awt.Color(255, 255, 255));
+        btnTambah.setIcon(new javax.swing.ImageIcon(getClass().getResource("/view/ikon/tambah_putih.png"))); // NOI18N
+        btnTambah.setIconTextGap(8);
+        btnTambah.setPreferredSize(new java.awt.Dimension(160, 40));
+        btnTambah.setText("Tambah Promo");
         btnTambah.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnTambahActionPerformed(evt);
             }
         });
-        pnlAksiKepala.add(btnTambah, java.awt.BorderLayout.NORTH);
-        pnlKepala.add(pnlAksiKepala, java.awt.BorderLayout.EAST);
-        pnlAtas.add(pnlKepala, java.awt.BorderLayout.NORTH);
-        pnlPesan.setBackground(new java.awt.Color(234, 246, 236));
-        pnlPesan.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 14, 10, 14));
-        pnlPesan.setLayout(new java.awt.BorderLayout());
-        lblPesan.setFont(new java.awt.Font("Segoe UI", 0, 12));
-        lblPesan.setForeground(new java.awt.Color(46, 125, 50));
-        lblPesan.setText("Pesan");
-        pnlPesan.add(lblPesan, java.awt.BorderLayout.CENTER);
-        pnlAtas.add(pnlPesan, java.awt.BorderLayout.CENTER);
-        add(pnlAtas, java.awt.BorderLayout.NORTH);
-
-        pnlIsi.setOpaque(false);
-        pnlIsi.setLayout(new java.awt.BorderLayout());
-        pnlKonten.setOpaque(false);
-        pnlKonten.setLayout(new java.awt.GridBagLayout());
-        pnlFilter.setOpaque(false);
-        pnlFilter.setLayout(new java.awt.GridBagLayout());
-        pnlCari.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 0, 0));
-        pnlCari.setOpaque(false);
-        pnlCari.setLayout(new java.awt.GridBagLayout());
-        lblCari.setFont(new java.awt.Font("Segoe UI", 1, 12));
-        lblCari.setForeground(new java.awt.Color(23, 43, 77));
-        lblCari.setText("Pencarian");
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        pnlCari.add(lblCari, gridBagConstraints);
-        txtCari.setFont(new java.awt.Font("Segoe UI", 0, 13));
-        txtCari.setForeground(new java.awt.Color(23, 43, 77));
-        txtCari.setBorder(javax.swing.BorderFactory.createCompoundBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(220, 227, 237)), javax.swing.BorderFactory.createEmptyBorder(8, 12, 8, 12)));
-        txtCari.setPreferredSize(new java.awt.Dimension(320, 38));
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(6, 0, 0, 0);
-        pnlCari.add(txtCari, gridBagConstraints);
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.SOUTHWEST;
-        pnlFilter.add(pnlCari, gridBagConstraints);
-        pnlStatus.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 0, 0));
-        pnlStatus.setOpaque(false);
-        pnlStatus.setLayout(new java.awt.GridBagLayout());
-        lblStatus.setFont(new java.awt.Font("Segoe UI", 1, 12));
-        lblStatus.setForeground(new java.awt.Color(23, 43, 77));
-        lblStatus.setText("Filter");
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        pnlStatus.add(lblStatus, gridBagConstraints);
-        cmbStatus.setFont(new java.awt.Font("Segoe UI", 0, 13));
-        cmbStatus.setForeground(new java.awt.Color(23, 43, 77));
-        cmbStatus.setBackground(new java.awt.Color(255, 255, 255));
-        cmbStatus.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Semua promo", "Aktif", "Terjadwal", "Berakhir" }));
-        cmbStatus.setPreferredSize(new java.awt.Dimension(190, 38));
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(6, 0, 0, 0);
-        pnlStatus.add(cmbStatus, gridBagConstraints);
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 1;
         gridBagConstraints.gridy = 0;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.SOUTHWEST;
-        gridBagConstraints.insets = new java.awt.Insets(0, 12, 0, 0);
-        pnlFilter.add(pnlStatus, gridBagConstraints);
-        btnTampilkan.setBackground(new java.awt.Color(255, 255, 255));
-        btnTampilkan.setFont(new java.awt.Font("Segoe UI", 1, 13));
-        btnTampilkan.setForeground(new java.awt.Color(23, 43, 77));
-        btnTampilkan.setText("Tampilkan");
-        btnTampilkan.setFocusPainted(false);
-        btnTampilkan.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnTampilkanActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 2;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.SOUTHWEST;
-        gridBagConstraints.insets = new java.awt.Insets(0, 12, 0, 0);
-        pnlFilter.add(btnTampilkan, gridBagConstraints);
-        pnlIsiFilter.setPreferredSize(new java.awt.Dimension(1, 1));
-        pnlIsiFilter.setOpaque(false);
-        pnlIsiFilter.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0));
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.weightx = 1.0;
-        pnlFilter.add(pnlIsiFilter, gridBagConstraints);
+        gridBagConstraints.gridheight = 2;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        pnlKepala.add(btnTambah, gridBagConstraints);
+        pnlFilter.setBackground(new java.awt.Color(255, 255, 255));
+        pnlFilter.setOpaque(false);
+        pnlFilter.setLayout(new java.awt.GridBagLayout());
+        lblCari.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblCari.setForeground(new java.awt.Color(52, 64, 84));
+        lblCari.setText("Cari");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        pnlFilter.add(lblCari, gridBagConstraints);
+        txtCari.setBorder(javax.swing.BorderFactory.createCompoundBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(208, 213, 221)), javax.swing.BorderFactory.createEmptyBorder(0, 10, 0, 10)));
+        txtCari.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        txtCari.setForeground(new java.awt.Color(16, 24, 40));
+        txtCari.setPreferredSize(new java.awt.Dimension(300, 38));
+        txtCari.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                txtCariActionPerformed(evt);
+            }
+        });
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
         gridBagConstraints.weightx = 1.0;
-        pnlKonten.add(pnlFilter, gridBagConstraints);
-        scrPromo.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(220, 227, 237)));
-        scrPromo.setPreferredSize(new java.awt.Dimension(700, 240));
+        gridBagConstraints.insets = new java.awt.Insets(6, 0, 0, 0);
+        pnlFilter.add(txtCari, gridBagConstraints);
+        btnCari.setBackground(new java.awt.Color(255, 255, 255));
+        btnCari.setBorder(javax.swing.BorderFactory.createCompoundBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(228, 231, 236)), javax.swing.BorderFactory.createEmptyBorder(0, 15, 0, 15)));
+        btnCari.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnCari.setFocusPainted(false);
+        btnCari.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnCari.setForeground(new java.awt.Color(16, 24, 40));
+        btnCari.setIcon(new javax.swing.ImageIcon(getClass().getResource("/view/ikon/cari.png"))); // NOI18N
+        btnCari.setIconTextGap(8);
+        btnCari.setPreferredSize(new java.awt.Dimension(96, 38));
+        btnCari.setText("Cari");
+        btnCari.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnCariActionPerformed(evt);
+            }
+        });
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(6, 8, 0, 0);
+        pnlFilter.add(btnCari, gridBagConstraints);
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 2;
+        gridBagConstraints.gridwidth = 2;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(20, 0, 0, 0);
+        pnlKepala.add(pnlFilter, gridBagConstraints);
+
+        add(pnlKepala, java.awt.BorderLayout.NORTH);
+
         scrPromo.setBackground(new java.awt.Color(255, 255, 255));
+        scrPromo.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(228, 231, 236)));
+        tblPromo.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        tblPromo.setGridColor(new java.awt.Color(228, 231, 236));
+        tblPromo.setIntercellSpacing(new java.awt.Dimension(0, 1));
         tblPromo.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
             },
             new String [] {
-                "Kode voucher", "Jenis", "Potongan", "Min. barang", "Periode", "Status", "Aksi"
+                "Kode Voucher", "Jenis", "Potongan", "Min. Barang", "Mulai", "Berakhir", "Aksi"
             }
         ) {
             boolean[] canEdit = new boolean [] {
@@ -314,78 +199,43 @@ public class PromoPanel extends javax.swing.JPanel implements Halaman {
                 return canEdit [columnIndex];
             }
         });
-        tblPromo.setFont(new java.awt.Font("Segoe UI", 0, 12));
-        tblPromo.setRowHeight(44);
+        tblPromo.setRowHeight(52);
+        tblPromo.setSelectionBackground(new java.awt.Color(232, 240, 255));
+        tblPromo.setSelectionForeground(new java.awt.Color(16, 24, 40));
+        tblPromo.setShowVerticalLines(false);
         scrPromo.setViewportView(tblPromo);
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(16, 0, 0, 0);
-        pnlKonten.add(scrPromo, gridBagConstraints);
-        pnlPager.setOpaque(false);
-        pnlPager.setLayout(new java.awt.BorderLayout());
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 2;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(16, 0, 0, 0);
-        pnlKonten.add(pnlPager, gridBagConstraints);
-        pnlInfo.setBackground(new java.awt.Color(234, 241, 252));
-        pnlInfo.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 14, 10, 14));
-        pnlInfo.setLayout(new java.awt.BorderLayout());
-        lblInfo.setFont(new java.awt.Font("Segoe UI", 0, 12));
-        lblInfo.setForeground(new java.awt.Color(33, 97, 213));
-        lblInfo.setText("Satu voucher per pesanan. Promo berlaku sesuai periode dan minimal jumlah barang.");
-        pnlInfo.add(lblInfo, java.awt.BorderLayout.CENTER);
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 3;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(16, 0, 0, 0);
-        pnlKonten.add(pnlInfo, gridBagConstraints);
-        pnlIsi.add(pnlKonten, java.awt.BorderLayout.NORTH);
-        add(pnlIsi, java.awt.BorderLayout.CENTER);
+        add(scrPromo, java.awt.BorderLayout.CENTER);
+        lblJumlah.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 0, 0, 0));
+        lblJumlah.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        lblJumlah.setForeground(new java.awt.Color(102, 112, 133));
+        lblJumlah.setText("0 data");
+        add(lblJumlah, java.awt.BorderLayout.SOUTH);
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnTambahActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnTambahActionPerformed
-        bukaForm(null);
+        if (PromoDialog.tampil(this, null)) {
+            NotifikasiDialog.tampil(this, "Promo berhasil ditambahkan", null);
+            muat();
+        }
     }//GEN-LAST:event_btnTambahActionPerformed
 
-    private void btnTampilkanActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnTampilkanActionPerformed
-        pager.reset();
+    private void txtCariActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtCariActionPerformed
         muat();
-    }//GEN-LAST:event_btnTampilkanActionPerformed
+    }//GEN-LAST:event_txtCariActionPerformed
+
+    private void btnCariActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnCariActionPerformed
+        muat();
+    }//GEN-LAST:event_btnCariActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JButton btnCari;
     private javax.swing.JButton btnTambah;
-    private javax.swing.JButton btnTampilkan;
-    private javax.swing.JComboBox<String> cmbStatus;
     private javax.swing.JLabel lblCari;
-    private javax.swing.JLabel lblInfo;
     private javax.swing.JLabel lblJudul;
-    private javax.swing.JLabel lblPesan;
-    private javax.swing.JLabel lblStatus;
-    private javax.swing.JLabel lblSubjudul;
-    private javax.swing.JPanel pnlAksiKepala;
-    private javax.swing.JPanel pnlAtas;
-    private javax.swing.JPanel pnlCari;
+    private javax.swing.JLabel lblJumlah;
+    private javax.swing.JLabel lblSub;
     private javax.swing.JPanel pnlFilter;
-    private javax.swing.JPanel pnlInfo;
-    private javax.swing.JPanel pnlIsi;
-    private javax.swing.JPanel pnlIsiFilter;
-    private javax.swing.JPanel pnlJudul;
     private javax.swing.JPanel pnlKepala;
-    private javax.swing.JPanel pnlKonten;
-    private javax.swing.JPanel pnlPager;
-    private javax.swing.JPanel pnlPesan;
-    private javax.swing.JPanel pnlStatus;
     private javax.swing.JScrollPane scrPromo;
     private javax.swing.JTable tblPromo;
     private javax.swing.JTextField txtCari;

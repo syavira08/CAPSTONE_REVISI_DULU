@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.math.BigDecimal;
 
 /**
@@ -33,6 +34,9 @@ public class Produk {
     @Column(name = "stok")
     private int stok;
 
+    @Transient                 // disimpan di tabel gambar_produk oleh GambarProdukDAO
+    private byte[] gambar;
+
     public Produk() { }   // dibutuhkan JPA
 
     public Produk(Integer id, String nama, String kategori, BigDecimal harga, int stok) {
@@ -56,4 +60,6 @@ public class Produk {
     public void setHarga(BigDecimal harga) { this.harga = harga; }
     public int getStok() { return stok; }
     public void setStok(int stok) { this.stok = stok; }
+    public byte[] getGambar() { return gambar; }
+    public void setGambar(byte[] gambar) { this.gambar = gambar; }
 }

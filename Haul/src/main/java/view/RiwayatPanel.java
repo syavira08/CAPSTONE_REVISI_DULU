@@ -1,307 +1,227 @@
 package view;
 
 import controller.PesananController;
-import java.awt.BorderLayout;
-import java.util.ArrayList;
+import controller.ValidasiException;
 import java.util.List;
 import javax.swing.table.DefaultTableModel;
 import model.Pesanan;
 
-/**
- * Flowchart Riwayat Pesanan:
- *  ada pesanan? -> tampilkan riwayat -> ingin membatalkan? / ingin melacak? -> halaman Lacak.
- * Tampilan dari Form Builder (RiwayatPanel.form); tombol Batalkan/Lacak per baris lewat KolomAksi.
- */
+/** Riwayat pesanan pelanggan: bayar, batalkan, lacak/lihat detail pesanan. */
 public class RiwayatPanel extends javax.swing.JPanel implements Halaman {
 
-    private final PelangganView jendela;
-    private final PesananController controller = new PesananController();
-    private final PagerPanel pager = new PagerPanel(8, "pesanan");
-    private final DefaultTableModel model;
-    private List<Pesanan> data = new ArrayList<>();
-    private List<Pesanan> tampil = new ArrayList<>();   // baris yang sedang tampil di tabel
+    private final PelangganView induk;
+    private final PesananController pesanan = new PesananController();
+    private List<Pesanan> data = List.of();
 
-    public RiwayatPanel(PelangganView jendela) {
-        this.jendela = jendela;
+    public RiwayatPanel(PelangganView induk) {
+        this.induk = induk;
         initComponents();
-        model = (DefaultTableModel) tblRiwayat.getModel();
-        UI.tabel(tblRiwayat, scrRiwayat);
-        UI.kolomBadge(tblRiwayat, 4);
-        tblRiwayat.getColumnModel().getColumn(2).setPreferredWidth(260);
-        tblRiwayat.getColumnModel().getColumn(5).setPreferredWidth(150);
-        new KolomAksi(tblRiwayat, 5,
-                new KolomAksi.Tombol("Batalkan", UI.Jenis.SEKUNDER,
-                        b -> b < tampil.size() && tampil.get(b).bisaDibatalkan(), this::batalkan),
-                new KolomAksi.Tombol(b -> "Lacak",
-                        b -> tampil.get(b).getTahap() == Pesanan.Tahap.DIKIRIM ? UI.Jenis.PRIMER : UI.Jenis.SEKUNDER,
-                        b -> b < tampil.size() && (tampil.get(b).getTahap() == Pesanan.Tahap.DIKIRIM
-                                || tampil.get(b).getTahap() == Pesanan.Tahap.SELESAI), this::lacak));
-        UI.input(txtCari, "Cari nomor pesanan...");
-        UI.combo(cmbStatus);
-        UI.sekunder(btnTampilkan);
-        UI.sorotan(pnlInfo, 10, 14, 10, 14);
-        UI.info(pnlInfo, lblInfo, "Pesanan hanya dapat dibatalkan sebelum diproses. Gunakan Lacak untuk pesanan yang sedang dikirim.");
-        pnlPager.add(pager, BorderLayout.CENTER);
-        pager.setAksi(this::tampilkanTabel);
-        UI.sembunyi(pnlPesan);
-        UI.tema(this);
+        Gaya.tabel(tblRiwayat);
+        Gaya.lebarKolom(tblRiwayat, 150, 150, 240, 120, 150, 200);
+        Gaya.kolomStatus(tblRiwayat, 4);
+        KolomAksi.pasang(tblRiwayat, 5, b -> tombol(data.get(b)), (b, t) -> aksi(data.get(b), t));
     }
 
     @Override
     public void muat() {
-        coba(() -> {
-            data = controller.riwayat(txtCari.getText(), tahapDari(cmbStatus.getSelectedItem()));
-            tampilkanTabel();
-            if (data.isEmpty()) info("Belum ada data pesanan. Mulai belanja dari menu Katalog.");
-        });
-    }
-
-    private void tampilkanTabel() {
-        if (tblRiwayat.isEditing()) tblRiwayat.getCellEditor().cancelCellEditing();
-        tampil = new ArrayList<>(pager.potong(data));
+        data = pesanan.riwayat(txtCari.getText(), tahap());
+        DefaultTableModel model = (DefaultTableModel) tblRiwayat.getModel();
         model.setRowCount(0);
-        for (Pesanan p : tampil) {
-            model.addRow(new Object[]{p.getNomor(), UI.tanggal(p.getTanggal().toLocalDate()), p.getNamaProduk(),
-                    UI.rupiah(p.getTotalHarga()), p.getTahap().toString(), ""});
+        for (Pesanan p : data) {
+            model.addRow(new Object[]{p.getNomor(), Gaya.tanggal(p.getTanggal()), p.getNamaProduk(),
+                Gaya.rupiah(p.getTotalHarga()), Gaya.statusPelanggan(p), ""});
         }
-        UI.sesuaikanTinggi(scrRiwayat, tblRiwayat);
+        lblJumlah.setText(data.size() + " pesanan");
     }
 
-    /** Cari Tahap dari label dropdown ("Semua status" = null). */
-    private static Pesanan.Tahap tahapDari(Object label) {
-        for (Pesanan.Tahap t : Pesanan.Tahap.values()) if (t.toString().equals(label)) return t;
-        return null;
-    }
-
-    private void batalkan(int baris) {
-        Pesanan p = tampil.get(baris);
-        boolean ya = UI.konfirmasi(this, "Batalkan pesanan?", "<b>" + p.getNomor() + "</b><br><br>Pesanan senilai "
-                + UI.rupiah(p.getTotalHarga()) + " belum dibayar. Setelah dibatalkan, pesanan tidak dapat dilanjutkan.",
-                "Ya, Batalkan", true);
-        if (ya && coba(() -> controller.batalkan(p))) {
-            muat();
-            sukses("Pesanan " + p.getNomor() + " berhasil dibatalkan.");
+    private Pesanan.Tahap tahap() {
+        for (Pesanan.Tahap t : Pesanan.Tahap.values()) {
+            if (t.toString().equals(cmbStatus.getSelectedItem())) return t;
         }
+        return null;   // Semua status
     }
 
-    private void lacak(int baris) {
-        jendela.lacak.setPesanan(tampil.get(baris));
-        jendela.buka(jendela.lacak);
+    /** Tombol per status: belum bayar -> Bayar & Batalkan, sudah bayar -> Lacak, selesai -> Lihat. */
+    private String[] tombol(Pesanan p) {
+        return switch (p.getTahap()) {
+            case MENUNGGU_PEMBAYARAN -> new String[]{"Bayar", "Batalkan"};
+            case DIPROSES, DIKIRIM -> new String[]{"Lacak"};
+            case SELESAI -> new String[]{"Lihat"};
+        };
     }
 
-    // ---------- pesan di dalam halaman (tanpa pop-up) ----------
-    private void sukses(String teks) { UI.pesan(pnlPesan, lblPesan, UI.Pesan.SUKSES, teks); }
-
-    private void galat(String teks) { UI.pesan(pnlPesan, lblPesan, UI.Pesan.GALAT, teks); }
-
-    private void info(String teks) { UI.pesan(pnlPesan, lblPesan, UI.Pesan.INFO, teks); }
-
-    @Override
-    public void bersihkanPesan() { UI.sembunyi(pnlPesan); }
-
-    /** Jalankan aksi; jika gagal, tampilkan pesannya. Mengembalikan true jika berhasil. */
-    private boolean coba(Runnable aksi) {
-        try {
-            aksi.run();
-            return true;
-        } catch (RuntimeException e) {
-            galat(e.getMessage());
-            return false;
+    private void aksi(Pesanan p, String tombol) {
+        switch (tombol) {
+            case "Bayar" -> {
+                if (PembayaranDialog.bayar(this, p)) {
+                    NotifikasiDialog.tampil(this, "Pembayaran berhasil", "Pesanan " + p.getNomor() + " sedang diproses");
+                }
+            }
+            case "Batalkan" -> {
+                if (KonfirmasiDialog.tanya(this, "Batalkan pesanan", "Yakin ingin membatalkan pesanan <b>"
+                        + p.getNomor() + "</b>? Stok barang akan dikembalikan.", "Batalkan", "dialog_hapus", true)) {
+                    try {
+                        pesanan.batalkan(p);
+                        NotifikasiDialog.tampil(this, "Pesanan dibatalkan", p.getNomor());
+                    } catch (ValidasiException e) {
+                        KonfirmasiDialog.gagal(this, e.getMessage());
+                    }
+                }
+            }
+            default -> DetailPesananDialog.tampil(this, p, true);   // Lacak / Lihat
         }
+        muat();
     }
 
+    /**
+     * Kode di bawah ini dibuat oleh GUI Form Builder NetBeans (jangan diubah manual).
+     */
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
+
         java.awt.GridBagConstraints gridBagConstraints;
 
-        pnlAtas = new javax.swing.JPanel();
         pnlKepala = new javax.swing.JPanel();
-        pnlJudul = new javax.swing.JPanel();
         lblJudul = new javax.swing.JLabel();
-        lblSubjudul = new javax.swing.JLabel();
-        pnlPesan = new javax.swing.JPanel();
-        lblPesan = new javax.swing.JLabel();
-        pnlIsi = new javax.swing.JPanel();
-        pnlKonten = new javax.swing.JPanel();
+        lblSub = new javax.swing.JLabel();
         pnlFilter = new javax.swing.JPanel();
-        pnlCari = new javax.swing.JPanel();
         lblCari = new javax.swing.JLabel();
         txtCari = new javax.swing.JTextField();
-        pnlStatus = new javax.swing.JPanel();
+        btnCari = new javax.swing.JButton();
         lblStatus = new javax.swing.JLabel();
         cmbStatus = new javax.swing.JComboBox<>();
-        btnTampilkan = new javax.swing.JButton();
-        pnlIsiFilter = new javax.swing.JPanel();
         scrRiwayat = new javax.swing.JScrollPane();
         tblRiwayat = new javax.swing.JTable();
-        pnlPager = new javax.swing.JPanel();
-        pnlInfo = new javax.swing.JPanel();
-        lblInfo = new javax.swing.JLabel();
+        lblJumlah = new javax.swing.JLabel();
 
-        setBackground(new java.awt.Color(243, 246, 250));
-        setBorder(javax.swing.BorderFactory.createEmptyBorder(28, 32, 32, 32));
+        setBackground(new java.awt.Color(245, 247, 251));
+        setBorder(javax.swing.BorderFactory.createEmptyBorder(24, 32, 24, 32));
         setLayout(new java.awt.BorderLayout());
 
-        pnlAtas.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 20, 0));
-        pnlAtas.setOpaque(false);
-        pnlAtas.setLayout(new java.awt.BorderLayout());
-
+        pnlKepala.setBackground(new java.awt.Color(255, 255, 255));
+        pnlKepala.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 16, 0));
         pnlKepala.setOpaque(false);
-        pnlKepala.setLayout(new java.awt.BorderLayout(12, 0));
-
-        pnlJudul.setOpaque(false);
-        pnlJudul.setLayout(new java.awt.BorderLayout(0, 6));
-
-        lblJudul.setFont(new java.awt.Font("Segoe UI", 1, 26)); // NOI18N
-        lblJudul.setForeground(new java.awt.Color(23, 43, 77));
-        lblJudul.setText("Riwayat pesanan");
-        pnlJudul.add(lblJudul, java.awt.BorderLayout.NORTH);
-
-        lblSubjudul.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        lblSubjudul.setForeground(new java.awt.Color(94, 108, 132));
-        lblSubjudul.setText("Pantau pembayaran dan pengiriman semua pesanan Anda.");
-        pnlJudul.add(lblSubjudul, java.awt.BorderLayout.CENTER);
-
-        pnlKepala.add(pnlJudul, java.awt.BorderLayout.CENTER);
-
-        pnlAtas.add(pnlKepala, java.awt.BorderLayout.NORTH);
-
-        pnlPesan.setBackground(new java.awt.Color(234, 246, 236));
-        pnlPesan.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 14, 10, 14));
-        pnlPesan.setLayout(new java.awt.BorderLayout());
-
-        lblPesan.setForeground(new java.awt.Color(46, 125, 50));
-        lblPesan.setText("Pesan");
-        pnlPesan.add(lblPesan, java.awt.BorderLayout.CENTER);
-
-        pnlAtas.add(pnlPesan, java.awt.BorderLayout.CENTER);
-
-        add(pnlAtas, java.awt.BorderLayout.NORTH);
-
-        pnlIsi.setOpaque(false);
-        pnlIsi.setLayout(new java.awt.BorderLayout());
-
-        pnlKonten.setOpaque(false);
-        pnlKonten.setLayout(new java.awt.GridBagLayout());
-
-        pnlFilter.setOpaque(false);
-        pnlFilter.setLayout(new java.awt.GridBagLayout());
-
-        pnlCari.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 0, 0));
-        pnlCari.setOpaque(false);
-        pnlCari.setLayout(new java.awt.GridBagLayout());
-
-        lblCari.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblCari.setForeground(new java.awt.Color(23, 43, 77));
-        lblCari.setText("Pencarian");
+        pnlKepala.setLayout(new java.awt.GridBagLayout());
+        lblJudul.setFont(new java.awt.Font("Segoe UI", 1, 22)); // NOI18N
+        lblJudul.setForeground(new java.awt.Color(16, 24, 40));
+        lblJudul.setText("Riwayat Pesanan");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        pnlCari.add(lblCari, gridBagConstraints);
-
-        txtCari.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        txtCari.setForeground(new java.awt.Color(23, 43, 77));
-        txtCari.setBorder(javax.swing.BorderFactory.createCompoundBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)), javax.swing.BorderFactory.createEmptyBorder(8, 12, 8, 12)));
-        txtCari.setPreferredSize(new java.awt.Dimension(320, 38));
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(6, 0, 0, 0);
-        pnlCari.add(txtCari, gridBagConstraints);
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.SOUTHWEST;
-        pnlFilter.add(pnlCari, gridBagConstraints);
-
-        pnlStatus.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 0, 0));
-        pnlStatus.setOpaque(false);
-        pnlStatus.setLayout(new java.awt.GridBagLayout());
-
-        lblStatus.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        lblStatus.setForeground(new java.awt.Color(23, 43, 77));
-        lblStatus.setText("Filter");
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        pnlStatus.add(lblStatus, gridBagConstraints);
-
-        cmbStatus.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        cmbStatus.setForeground(new java.awt.Color(23, 43, 77));
-        cmbStatus.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Semua status", "Menunggu Pembayaran", "Diproses", "Dikirim", "Selesai" }));
-        cmbStatus.setPreferredSize(new java.awt.Dimension(200, 38));
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(6, 0, 0, 0);
-        pnlStatus.add(cmbStatus, gridBagConstraints);
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 1;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.SOUTHWEST;
-        gridBagConstraints.insets = new java.awt.Insets(0, 12, 0, 0);
-        pnlFilter.add(pnlStatus, gridBagConstraints);
-
-        btnTampilkan.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
-        btnTampilkan.setForeground(new java.awt.Color(23, 43, 77));
-        btnTampilkan.setText("Tampilkan");
-        btnTampilkan.setFocusPainted(false);
-        btnTampilkan.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnTampilkanActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 2;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.SOUTHWEST;
-        gridBagConstraints.insets = new java.awt.Insets(0, 12, 0, 0);
-        pnlFilter.add(btnTampilkan, gridBagConstraints);
-
-        pnlIsiFilter.setPreferredSize(new java.awt.Dimension(1, 1));
-        pnlIsiFilter.setOpaque(false);
-        pnlIsiFilter.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0));
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 3;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
         gridBagConstraints.weightx = 1.0;
-        pnlFilter.add(pnlIsiFilter, gridBagConstraints);
-
+        pnlKepala.add(lblJudul, gridBagConstraints);
+        lblSub.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        lblSub.setForeground(new java.awt.Color(102, 112, 133));
+        lblSub.setText("Bayar pesanan yang menunggu pembayaran atau lacak pesanan yang sudah dibayar.");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(4, 0, 0, 0);
+        pnlKepala.add(lblSub, gridBagConstraints);
+        pnlFilter.setBackground(new java.awt.Color(255, 255, 255));
+        pnlFilter.setOpaque(false);
+        pnlFilter.setLayout(new java.awt.GridBagLayout());
+        lblCari.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblCari.setForeground(new java.awt.Color(52, 64, 84));
+        lblCari.setText("Cari");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        pnlFilter.add(lblCari, gridBagConstraints);
+        txtCari.setBorder(javax.swing.BorderFactory.createCompoundBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(208, 213, 221)), javax.swing.BorderFactory.createEmptyBorder(0, 10, 0, 10)));
+        txtCari.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        txtCari.setForeground(new java.awt.Color(16, 24, 40));
+        txtCari.setPreferredSize(new java.awt.Dimension(300, 38));
+        txtCari.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                txtCariActionPerformed(evt);
+            }
+        });
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
         gridBagConstraints.weightx = 1.0;
-        pnlKonten.add(pnlFilter, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(6, 0, 0, 0);
+        pnlFilter.add(txtCari, gridBagConstraints);
+        btnCari.setBackground(new java.awt.Color(255, 255, 255));
+        btnCari.setBorder(javax.swing.BorderFactory.createCompoundBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(228, 231, 236)), javax.swing.BorderFactory.createEmptyBorder(0, 15, 0, 15)));
+        btnCari.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnCari.setFocusPainted(false);
+        btnCari.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnCari.setForeground(new java.awt.Color(16, 24, 40));
+        btnCari.setIcon(new javax.swing.ImageIcon(getClass().getResource("/view/ikon/cari.png"))); // NOI18N
+        btnCari.setIconTextGap(8);
+        btnCari.setPreferredSize(new java.awt.Dimension(96, 38));
+        btnCari.setText("Cari");
+        btnCari.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnCariActionPerformed(evt);
+            }
+        });
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(6, 8, 0, 0);
+        pnlFilter.add(btnCari, gridBagConstraints);
+        lblStatus.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblStatus.setForeground(new java.awt.Color(52, 64, 84));
+        lblStatus.setText("Status");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 2;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(0, 16, 0, 0);
+        pnlFilter.add(lblStatus, gridBagConstraints);
+        cmbStatus.setBackground(new java.awt.Color(255, 255, 255));
+        cmbStatus.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        cmbStatus.setForeground(new java.awt.Color(16, 24, 40));
+        cmbStatus.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Semua status", "Menunggu Pembayaran", "Dikirim", "Selesai" }));
+        cmbStatus.setPreferredSize(new java.awt.Dimension(220, 38));
+        cmbStatus.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                cmbStatusActionPerformed(evt);
+            }
+        });
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 2;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(6, 16, 0, 0);
+        pnlFilter.add(cmbStatus, gridBagConstraints);
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 2;
+        gridBagConstraints.gridwidth = 2;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(20, 0, 0, 0);
+        pnlKepala.add(pnlFilter, gridBagConstraints);
 
-        scrRiwayat.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
-        scrRiwayat.setPreferredSize(new java.awt.Dimension(700, 200));
+        add(pnlKepala, java.awt.BorderLayout.NORTH);
+
         scrRiwayat.setBackground(new java.awt.Color(255, 255, 255));
-
+        scrRiwayat.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(228, 231, 236)));
+        tblRiwayat.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        tblRiwayat.setGridColor(new java.awt.Color(228, 231, 236));
+        tblRiwayat.setIntercellSpacing(new java.awt.Dimension(0, 1));
         tblRiwayat.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
             },
             new String [] {
-                "Nomor pesanan", "Tanggal", "Produk", "Total", "Status", "Aksi"
+                "No. Pesanan", "Tanggal", "Produk", "Total", "Status", "Aksi"
             }
         ) {
             boolean[] canEdit = new boolean [] {
@@ -312,77 +232,41 @@ public class RiwayatPanel extends javax.swing.JPanel implements Halaman {
                 return canEdit [columnIndex];
             }
         });
-        tblRiwayat.setRowHeight(44);
+        tblRiwayat.setRowHeight(52);
+        tblRiwayat.setSelectionBackground(new java.awt.Color(232, 240, 255));
+        tblRiwayat.setSelectionForeground(new java.awt.Color(16, 24, 40));
+        tblRiwayat.setShowVerticalLines(false);
         scrRiwayat.setViewportView(tblRiwayat);
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(16, 0, 0, 0);
-        pnlKonten.add(scrRiwayat, gridBagConstraints);
-
-        pnlPager.setOpaque(false);
-        pnlPager.setLayout(new java.awt.BorderLayout());
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 2;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(16, 0, 0, 0);
-        pnlKonten.add(pnlPager, gridBagConstraints);
-
-        pnlInfo.setBackground(new java.awt.Color(234, 241, 252));
-        pnlInfo.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 14, 10, 14));
-        pnlInfo.setLayout(new java.awt.BorderLayout());
-
-        lblInfo.setForeground(new java.awt.Color(33, 97, 213));
-        lblInfo.setText("Pesanan hanya dapat dibatalkan sebelum diproses. Gunakan Lacak untuk pesanan yang sedang dikirim.");
-        pnlInfo.add(lblInfo, java.awt.BorderLayout.CENTER);
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 3;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(16, 0, 0, 0);
-        pnlKonten.add(pnlInfo, gridBagConstraints);
-
-        pnlIsi.add(pnlKonten, java.awt.BorderLayout.NORTH);
-
-        add(pnlIsi, java.awt.BorderLayout.CENTER);
+        add(scrRiwayat, java.awt.BorderLayout.CENTER);
+        lblJumlah.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 0, 0, 0));
+        lblJumlah.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        lblJumlah.setForeground(new java.awt.Color(102, 112, 133));
+        lblJumlah.setText("0 pesanan");
+        add(lblJumlah, java.awt.BorderLayout.SOUTH);
     }// </editor-fold>//GEN-END:initComponents
 
-    private void btnTampilkanActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnTampilkanActionPerformed
-        pager.reset();
+    private void txtCariActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtCariActionPerformed
         muat();
-    }//GEN-LAST:event_btnTampilkanActionPerformed
+    }//GEN-LAST:event_txtCariActionPerformed
+
+    private void btnCariActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnCariActionPerformed
+        muat();
+    }//GEN-LAST:event_btnCariActionPerformed
+
+    private void cmbStatusActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbStatusActionPerformed
+        muat();
+    }//GEN-LAST:event_cmbStatusActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JButton btnTampilkan;
+    private javax.swing.JButton btnCari;
     private javax.swing.JComboBox<String> cmbStatus;
     private javax.swing.JLabel lblCari;
-    private javax.swing.JLabel lblInfo;
     private javax.swing.JLabel lblJudul;
-    private javax.swing.JLabel lblPesan;
+    private javax.swing.JLabel lblJumlah;
     private javax.swing.JLabel lblStatus;
-    private javax.swing.JLabel lblSubjudul;
-    private javax.swing.JPanel pnlAtas;
-    private javax.swing.JPanel pnlCari;
+    private javax.swing.JLabel lblSub;
     private javax.swing.JPanel pnlFilter;
-    private javax.swing.JPanel pnlInfo;
-    private javax.swing.JPanel pnlIsi;
-    private javax.swing.JPanel pnlIsiFilter;
-    private javax.swing.JPanel pnlJudul;
     private javax.swing.JPanel pnlKepala;
-    private javax.swing.JPanel pnlKonten;
-    private javax.swing.JPanel pnlPager;
-    private javax.swing.JPanel pnlPesan;
-    private javax.swing.JPanel pnlStatus;
     private javax.swing.JScrollPane scrRiwayat;
     private javax.swing.JTable tblRiwayat;
     private javax.swing.JTextField txtCari;

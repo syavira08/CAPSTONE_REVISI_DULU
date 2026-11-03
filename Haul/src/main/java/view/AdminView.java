@@ -1,334 +1,306 @@
 package view;
 
 import controller.AuthController;
-import java.awt.CardLayout;
-import java.awt.Cursor;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
 
-/**
- * Flowchart Menu Admin: Kelola Produk, Promo, Pengiriman, Pesanan, Data Pelanggan, Logout (sidebar kiri).
- * Tampilan dibuat dengan GUI Form Builder (AdminView.form); halaman ditukar memakai CardLayout.
- */
+/** Menu utama admin: Kelola Produk, Promo, Pesanan, Data Pelanggan, dan Logout (paling bawah). */
 public class AdminView extends javax.swing.JFrame {
 
-    private final Map<String, Halaman> halaman = new LinkedHashMap<>();
-    private final Map<String, JLabel> menu = new LinkedHashMap<>();
+    private final java.util.Map<String, Halaman> halaman = new java.util.LinkedHashMap<>();
+    private final java.util.Map<String, javax.swing.JButton> tombolMenu = new java.util.LinkedHashMap<>();
 
     public AdminView() {
         initComponents();
-        UI.logo(lblLogo);
-        lblAdmin.setText(AuthController.getPenggunaLogin().getKeterangan());
-        tambahMenu("Produk", "produk", lblMenuProduk, new ProdukPanel());
-        tambahMenu("Promo", "promo", lblMenuPromo, new PromoPanel());
-        tambahMenu("Pengiriman", "truk", lblMenuPengiriman, new PengirimanPanel());
-        tambahMenu("Pesanan", "pesanan", lblMenuPesanan, new PesananAdminPanel());
-        tambahMenu("Data Pelanggan", "pelanggan", lblMenuPelanggan, new DataPelangganPanel());
-        UI.ikon(lblMenuLogout, "keluar", 18, UI.PUDAR);
-        lblMenuLogout.setIconTextGap(10);
-        lblMenuLogout.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        UI.tema(getContentPane());
-        pack();
-        setLocationRelativeTo(null);
-        buka("Produk");
+        lblNamaAdmin.setText(AuthController.getPenggunaLogin().getNama());   // nama saja, tanpa jabatan
+        // logika layout controller: setiap halaman (JPanel Form) dipasang ke CardLayout
+        daftarkan("produk", new ProdukPanel(), btnProduk);
+        daftarkan("promo", new PromoPanel(), btnPromo);
+        daftarkan("pesanan", new PesananAdminPanel(), btnPesanan);
+        daftarkan("pelanggan", new DataPelangganPanel(), btnPelanggan);
+        buka("produk");
     }
 
-    private void tambahMenu(String nama, String ikon, JLabel item, JComponent h) {
-        halaman.put(nama, (Halaman) h);
-        pnlWadah.add(UI.gulir(h), nama);
-        UI.ikon(item, ikon, 18, UI.PUDAR);
-        item.setIconTextGap(10);
-        item.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        menu.put(nama, item);
+    private void daftarkan(String nama, javax.swing.JPanel panel, javax.swing.JButton tombol) {
+        halaman.put(nama, (Halaman) panel);
+        tombolMenu.put(nama, tombol);
+        pnlHalaman.add(panel, nama);
     }
 
-    /** Buka halaman menu, muat datanya, dan sorot menu di sidebar. */
+    /** Buka halaman, tandai menu aktif, lalu muat ulang datanya. */
     private void buka(String nama) {
-        Halaman h = halaman.get(nama);
-        h.bersihkanPesan();
-        h.muat();
-        ((CardLayout) pnlWadah.getLayout()).show(pnlWadah, nama);
-        lblJejak.setText("Administrasi / " + nama);
-        menu.forEach((n, l) -> {
-            l.setBackground(n.equals(nama) ? UI.BIRU_MUDA : UI.PUTIH);
-            l.setForeground(n.equals(nama) ? UI.BIRU : UI.TEKS);
+        ((java.awt.CardLayout) pnlHalaman.getLayout()).show(pnlHalaman, nama);
+        tombolMenu.forEach((n, b) -> {
+            boolean aktif = n.equals(nama);
+            b.setBackground(aktif ? Gaya.BIRU_MUDA : java.awt.Color.WHITE);
+            b.setForeground(aktif ? Gaya.BIRU : new java.awt.Color(52, 64, 84));
+            b.setIcon(Gaya.ikon(aktif ? n + "_aktif" : n));
         });
+        lblLokasi.setText("Administrasi / " + tombolMenu.get(nama).getText());
+        halaman.get(nama).muat();
     }
 
-    private void logout() {
-        new AuthController().logout();
-        dispose();
-        new LoginView().setVisible(true);
-    }
-
+    /**
+     * Kode di bawah ini dibuat oleh GUI Form Builder NetBeans (jangan diubah manual).
+     */
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
+
         java.awt.GridBagConstraints gridBagConstraints;
 
-        pnlSidebar = new javax.swing.JPanel();
+        pnlSamping = new javax.swing.JPanel();
         lblLogo = new javax.swing.JLabel();
-        lblRuang = new javax.swing.JLabel();
-        lblMenuProduk = new javax.swing.JLabel();
-        lblMenuPromo = new javax.swing.JLabel();
-        lblMenuPengiriman = new javax.swing.JLabel();
-        lblMenuPesanan = new javax.swing.JLabel();
-        lblMenuPelanggan = new javax.swing.JLabel();
-        lblMenuLogout = new javax.swing.JLabel();
-        pnlPenutup = new javax.swing.JPanel();
-        lblVersi = new javax.swing.JLabel();
-        pnlKanan = new javax.swing.JPanel();
-        pnlTopbar = new javax.swing.JPanel();
-        lblJejak = new javax.swing.JLabel();
-        lblAdmin = new javax.swing.JLabel();
-        pnlWadah = new javax.swing.JPanel();
+        lblMenu = new javax.swing.JLabel();
+        btnProduk = new javax.swing.JButton();
+        btnPromo = new javax.swing.JButton();
+        btnPesanan = new javax.swing.JButton();
+        btnPelanggan = new javax.swing.JButton();
+        pnlSisa = new javax.swing.JPanel();
+        sepLogout = new javax.swing.JSeparator();
+        btnLogout = new javax.swing.JButton();
+        pnlUtama = new javax.swing.JPanel();
+        pnlAtas = new javax.swing.JPanel();
+        lblLokasi = new javax.swing.JLabel();
+        lblNamaAdmin = new javax.swing.JLabel();
+        pnlHalaman = new javax.swing.JPanel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("HAULECTRA • Admin");
-        setPreferredSize(new java.awt.Dimension(1280, 820));
+        setMinimumSize(new java.awt.Dimension(1240, 740));
+        setTitle("HAULECTRA - Admin");
+        getContentPane().setLayout(new java.awt.BorderLayout());
 
-        pnlSidebar.setBackground(new java.awt.Color(255, 255, 255));
-        pnlSidebar.setBorder(javax.swing.BorderFactory.createCompoundBorder(null, javax.swing.BorderFactory.createEmptyBorder(18, 18, 18, 12)));
-        pnlSidebar.setPreferredSize(new java.awt.Dimension(210, 10));
-        pnlSidebar.setLayout(new java.awt.GridBagLayout());
-
-        lblLogo.setFont(new java.awt.Font("Segoe UI", 1, 20)); // NOI18N
-        lblLogo.setForeground(new java.awt.Color(23, 43, 77));
+        pnlSamping.setBackground(new java.awt.Color(255, 255, 255));
+        pnlSamping.setBorder(javax.swing.BorderFactory.createCompoundBorder(javax.swing.BorderFactory.createMatteBorder(0, 0, 0, 1, new java.awt.Color(228, 231, 236)), javax.swing.BorderFactory.createEmptyBorder(20, 16, 20, 16)));
+        pnlSamping.setPreferredSize(new java.awt.Dimension(248, 600));
+        pnlSamping.setLayout(new java.awt.GridBagLayout());
+        lblLogo.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
+        lblLogo.setForeground(new java.awt.Color(16, 24, 40));
+        lblLogo.setIcon(new javax.swing.ImageIcon(getClass().getResource("/view/ikon/logo.png"))); // NOI18N
+        lblLogo.setIconTextGap(10);
         lblLogo.setText("HAULECTRA");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        pnlSidebar.add(lblLogo, gridBagConstraints);
-
-        lblRuang.setFont(new java.awt.Font("Segoe UI", 1, 11)); // NOI18N
-        lblRuang.setForeground(new java.awt.Color(94, 108, 132));
-        lblRuang.setText("RUANG ADMINISTRASI");
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(0, 0, 28, 0);
+        pnlSamping.add(lblLogo, gridBagConstraints);
+        lblMenu.setFont(new java.awt.Font("Segoe UI", 1, 11)); // NOI18N
+        lblMenu.setForeground(new java.awt.Color(102, 112, 133));
+        lblMenu.setText("MENU ADMIN");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 1;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(24, 0, 0, 0);
-        pnlSidebar.add(lblRuang, gridBagConstraints);
-
-        lblMenuProduk.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        lblMenuProduk.setForeground(new java.awt.Color(23, 43, 77));
-        lblMenuProduk.setText("Produk");
-        lblMenuProduk.setOpaque(true);
-        lblMenuProduk.setBackground(new java.awt.Color(255, 255, 255));
-        lblMenuProduk.setBorder(javax.swing.BorderFactory.createEmptyBorder(9, 10, 9, 10));
-        lblMenuProduk.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                lblMenuProdukMouseClicked(evt);
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(0, 12, 8, 0);
+        pnlSamping.add(lblMenu, gridBagConstraints);
+        btnProduk.setBackground(new java.awt.Color(255, 255, 255));
+        btnProduk.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 12, 0, 12));
+        btnProduk.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnProduk.setFocusPainted(false);
+        btnProduk.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
+        btnProduk.setForeground(new java.awt.Color(52, 64, 84));
+        btnProduk.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        btnProduk.setIcon(new javax.swing.ImageIcon(getClass().getResource("/view/ikon/produk.png"))); // NOI18N
+        btnProduk.setIconTextGap(10);
+        btnProduk.setPreferredSize(new java.awt.Dimension(200, 42));
+        btnProduk.setText("Kelola Produk");
+        btnProduk.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnProdukActionPerformed(evt);
             }
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 2;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
         gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(10, 0, 0, 0);
-        pnlSidebar.add(lblMenuProduk, gridBagConstraints);
-
-        lblMenuPromo.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        lblMenuPromo.setForeground(new java.awt.Color(23, 43, 77));
-        lblMenuPromo.setText("Promo");
-        lblMenuPromo.setOpaque(true);
-        lblMenuPromo.setBackground(new java.awt.Color(255, 255, 255));
-        lblMenuPromo.setBorder(javax.swing.BorderFactory.createEmptyBorder(9, 10, 9, 10));
-        lblMenuPromo.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                lblMenuPromoMouseClicked(evt);
+        gridBagConstraints.insets = new java.awt.Insets(0, 0, 4, 0);
+        pnlSamping.add(btnProduk, gridBagConstraints);
+        btnPromo.setBackground(new java.awt.Color(255, 255, 255));
+        btnPromo.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 12, 0, 12));
+        btnPromo.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnPromo.setFocusPainted(false);
+        btnPromo.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
+        btnPromo.setForeground(new java.awt.Color(52, 64, 84));
+        btnPromo.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        btnPromo.setIcon(new javax.swing.ImageIcon(getClass().getResource("/view/ikon/promo.png"))); // NOI18N
+        btnPromo.setIconTextGap(10);
+        btnPromo.setPreferredSize(new java.awt.Dimension(200, 42));
+        btnPromo.setText("Kelola Promo");
+        btnPromo.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnPromoActionPerformed(evt);
             }
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 3;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
         gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(2, 0, 0, 0);
-        pnlSidebar.add(lblMenuPromo, gridBagConstraints);
-
-        lblMenuPengiriman.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        lblMenuPengiriman.setForeground(new java.awt.Color(23, 43, 77));
-        lblMenuPengiriman.setText("Pengiriman");
-        lblMenuPengiriman.setOpaque(true);
-        lblMenuPengiriman.setBackground(new java.awt.Color(255, 255, 255));
-        lblMenuPengiriman.setBorder(javax.swing.BorderFactory.createEmptyBorder(9, 10, 9, 10));
-        lblMenuPengiriman.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                lblMenuPengirimanMouseClicked(evt);
+        gridBagConstraints.insets = new java.awt.Insets(0, 0, 4, 0);
+        pnlSamping.add(btnPromo, gridBagConstraints);
+        btnPesanan.setBackground(new java.awt.Color(255, 255, 255));
+        btnPesanan.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 12, 0, 12));
+        btnPesanan.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnPesanan.setFocusPainted(false);
+        btnPesanan.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
+        btnPesanan.setForeground(new java.awt.Color(52, 64, 84));
+        btnPesanan.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        btnPesanan.setIcon(new javax.swing.ImageIcon(getClass().getResource("/view/ikon/pesanan.png"))); // NOI18N
+        btnPesanan.setIconTextGap(10);
+        btnPesanan.setPreferredSize(new java.awt.Dimension(200, 42));
+        btnPesanan.setText("Kelola Pesanan");
+        btnPesanan.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnPesananActionPerformed(evt);
             }
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 4;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
         gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(2, 0, 0, 0);
-        pnlSidebar.add(lblMenuPengiriman, gridBagConstraints);
-
-        lblMenuPesanan.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        lblMenuPesanan.setForeground(new java.awt.Color(23, 43, 77));
-        lblMenuPesanan.setText("Pesanan");
-        lblMenuPesanan.setOpaque(true);
-        lblMenuPesanan.setBackground(new java.awt.Color(255, 255, 255));
-        lblMenuPesanan.setBorder(javax.swing.BorderFactory.createEmptyBorder(9, 10, 9, 10));
-        lblMenuPesanan.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                lblMenuPesananMouseClicked(evt);
+        gridBagConstraints.insets = new java.awt.Insets(0, 0, 4, 0);
+        pnlSamping.add(btnPesanan, gridBagConstraints);
+        btnPelanggan.setBackground(new java.awt.Color(255, 255, 255));
+        btnPelanggan.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 12, 0, 12));
+        btnPelanggan.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnPelanggan.setFocusPainted(false);
+        btnPelanggan.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
+        btnPelanggan.setForeground(new java.awt.Color(52, 64, 84));
+        btnPelanggan.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        btnPelanggan.setIcon(new javax.swing.ImageIcon(getClass().getResource("/view/ikon/pelanggan.png"))); // NOI18N
+        btnPelanggan.setIconTextGap(10);
+        btnPelanggan.setPreferredSize(new java.awt.Dimension(200, 42));
+        btnPelanggan.setText("Data Pelanggan");
+        btnPelanggan.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnPelangganActionPerformed(evt);
             }
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 5;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
         gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(2, 0, 0, 0);
-        pnlSidebar.add(lblMenuPesanan, gridBagConstraints);
-
-        lblMenuPelanggan.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        lblMenuPelanggan.setForeground(new java.awt.Color(23, 43, 77));
-        lblMenuPelanggan.setText("Data Pelanggan");
-        lblMenuPelanggan.setOpaque(true);
-        lblMenuPelanggan.setBackground(new java.awt.Color(255, 255, 255));
-        lblMenuPelanggan.setBorder(javax.swing.BorderFactory.createEmptyBorder(9, 10, 9, 10));
-        lblMenuPelanggan.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                lblMenuPelangganMouseClicked(evt);
-            }
-        });
+        gridBagConstraints.insets = new java.awt.Insets(0, 0, 4, 0);
+        pnlSamping.add(btnPelanggan, gridBagConstraints);
+        pnlSisa.setBackground(new java.awt.Color(255, 255, 255));
+        pnlSisa.setOpaque(false);
+        pnlSisa.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 5, 5));
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 6;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(2, 0, 0, 0);
-        pnlSidebar.add(lblMenuPelanggan, gridBagConstraints);
+        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.weighty = 1.0;
+        pnlSamping.add(pnlSisa, gridBagConstraints);
 
-        lblMenuLogout.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        lblMenuLogout.setForeground(new java.awt.Color(23, 43, 77));
-        lblMenuLogout.setText("Logout");
-        lblMenuLogout.setOpaque(true);
-        lblMenuLogout.setBackground(new java.awt.Color(255, 255, 255));
-        lblMenuLogout.setBorder(javax.swing.BorderFactory.createEmptyBorder(9, 10, 9, 10));
-        lblMenuLogout.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                lblMenuLogoutMouseClicked(evt);
-            }
-        });
+        sepLogout.setForeground(new java.awt.Color(228, 231, 236));
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 7;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(2, 0, 0, 0);
-        pnlSidebar.add(lblMenuLogout, gridBagConstraints);
-
-        pnlPenutup.setPreferredSize(new java.awt.Dimension(1, 1));
-        pnlPenutup.setOpaque(false);
-        pnlPenutup.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0));
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(0, 0, 16, 0);
+        pnlSamping.add(sepLogout, gridBagConstraints);
+        btnLogout.setBackground(new java.awt.Color(217, 45, 32));
+        btnLogout.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 16, 0, 16));
+        btnLogout.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnLogout.setFocusPainted(false);
+        btnLogout.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnLogout.setForeground(new java.awt.Color(255, 255, 255));
+        btnLogout.setIcon(new javax.swing.ImageIcon(getClass().getResource("/view/ikon/logout_putih.png"))); // NOI18N
+        btnLogout.setIconTextGap(8);
+        btnLogout.setPreferredSize(new java.awt.Dimension(120, 42));
+        btnLogout.setText("Logout");
+        btnLogout.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnLogoutActionPerformed(evt);
+            }
+        });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 8;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.weighty = 1.0;
-        pnlSidebar.add(pnlPenutup, gridBagConstraints);
-
-        lblVersi.setFont(new java.awt.Font("Segoe UI", 0, 11)); // NOI18N
-        lblVersi.setForeground(new java.awt.Color(94, 108, 132));
-        lblVersi.setText("<html>HAULECTRA Desktop<br>Versi 1.0 • Admin</html>");
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 9;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
         gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(8, 0, 0, 0);
-        pnlSidebar.add(lblVersi, gridBagConstraints);
+        pnlSamping.add(btnLogout, gridBagConstraints);
+        getContentPane().add(pnlSamping, java.awt.BorderLayout.WEST);
 
-        getContentPane().add(pnlSidebar, java.awt.BorderLayout.WEST);
+        pnlUtama.setBackground(new java.awt.Color(245, 247, 251));
+        pnlUtama.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 0, 0));
+        pnlUtama.setLayout(new java.awt.BorderLayout());
+        pnlAtas.setBackground(new java.awt.Color(255, 255, 255));
+        pnlAtas.setBorder(javax.swing.BorderFactory.createCompoundBorder(javax.swing.BorderFactory.createMatteBorder(0, 0, 1, 0, new java.awt.Color(228, 231, 236)), javax.swing.BorderFactory.createEmptyBorder(0, 32, 0, 32)));
+        pnlAtas.setPreferredSize(new java.awt.Dimension(900, 56));
+        pnlAtas.setLayout(new java.awt.BorderLayout());
+        lblLokasi.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        lblLokasi.setForeground(new java.awt.Color(102, 112, 133));
+        lblLokasi.setText("Administrasi / Produk");
+        pnlAtas.add(lblLokasi, java.awt.BorderLayout.WEST);
+        lblNamaAdmin.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblNamaAdmin.setForeground(new java.awt.Color(52, 64, 84));
+        lblNamaAdmin.setText("Nama Admin");
+        pnlAtas.add(lblNamaAdmin, java.awt.BorderLayout.EAST);
+        pnlUtama.add(pnlAtas, java.awt.BorderLayout.NORTH);
 
-        pnlKanan.setOpaque(false);
-        pnlKanan.setLayout(new java.awt.BorderLayout());
+        pnlHalaman.setBackground(new java.awt.Color(245, 247, 251));
+        pnlHalaman.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 0, 0));
+        pnlHalaman.setLayout(new java.awt.CardLayout());
+        pnlUtama.add(pnlHalaman, java.awt.BorderLayout.CENTER);
 
-        pnlTopbar.setBackground(new java.awt.Color(255, 255, 255));
-        pnlTopbar.setBorder(javax.swing.BorderFactory.createCompoundBorder(null, javax.swing.BorderFactory.createEmptyBorder(14, 32, 14, 32)));
-        pnlTopbar.setLayout(new java.awt.BorderLayout());
-
-        lblJejak.setForeground(new java.awt.Color(94, 108, 132));
-        lblJejak.setText("Administrasi / Produk");
-        pnlTopbar.add(lblJejak, java.awt.BorderLayout.WEST);
-
-        lblAdmin.setForeground(new java.awt.Color(23, 43, 77));
-        lblAdmin.setText("Admin Haul 3 • Administrator");
-        pnlTopbar.add(lblAdmin, java.awt.BorderLayout.EAST);
-
-        pnlKanan.add(pnlTopbar, java.awt.BorderLayout.NORTH);
-
-        pnlWadah.setBackground(new java.awt.Color(243, 246, 250));
-        pnlWadah.setLayout(new java.awt.CardLayout());
-        pnlKanan.add(pnlWadah, java.awt.BorderLayout.CENTER);
-
-        getContentPane().add(pnlKanan, java.awt.BorderLayout.CENTER);
+        getContentPane().add(pnlUtama, java.awt.BorderLayout.CENTER);
 
         pack();
+        setLocationRelativeTo(null);
     }// </editor-fold>//GEN-END:initComponents
 
-    private void lblMenuProdukMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_lblMenuProdukMouseClicked
-        buka("Produk");
-    }//GEN-LAST:event_lblMenuProdukMouseClicked
+    private void btnProdukActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnProdukActionPerformed
+        buka("produk");
+    }//GEN-LAST:event_btnProdukActionPerformed
 
-    private void lblMenuPromoMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_lblMenuPromoMouseClicked
-        buka("Promo");
-    }//GEN-LAST:event_lblMenuPromoMouseClicked
+    private void btnPromoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnPromoActionPerformed
+        buka("promo");
+    }//GEN-LAST:event_btnPromoActionPerformed
 
-    private void lblMenuPengirimanMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_lblMenuPengirimanMouseClicked
-        buka("Pengiriman");
-    }//GEN-LAST:event_lblMenuPengirimanMouseClicked
+    private void btnPesananActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnPesananActionPerformed
+        buka("pesanan");
+    }//GEN-LAST:event_btnPesananActionPerformed
 
-    private void lblMenuPesananMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_lblMenuPesananMouseClicked
-        buka("Pesanan");
-    }//GEN-LAST:event_lblMenuPesananMouseClicked
+    private void btnPelangganActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnPelangganActionPerformed
+        buka("pelanggan");
+    }//GEN-LAST:event_btnPelangganActionPerformed
 
-    private void lblMenuPelangganMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_lblMenuPelangganMouseClicked
-        buka("Data Pelanggan");
-    }//GEN-LAST:event_lblMenuPelangganMouseClicked
-
-    private void lblMenuLogoutMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_lblMenuLogoutMouseClicked
-        logout();
-    }//GEN-LAST:event_lblMenuLogoutMouseClicked
+    private void btnLogoutActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnLogoutActionPerformed
+        if (KonfirmasiDialog.tanya(this, "Logout", "Yakin ingin keluar dari akun admin?", "Logout",
+                "dialog_logout", true)) {
+            new AuthController().logout();
+            dispose();
+            new LoginView().setVisible(true);
+        }
+    }//GEN-LAST:event_btnLogoutActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JLabel lblAdmin;
-    private javax.swing.JLabel lblJejak;
+    private javax.swing.JButton btnLogout;
+    private javax.swing.JButton btnPelanggan;
+    private javax.swing.JButton btnPesanan;
+    private javax.swing.JButton btnProduk;
+    private javax.swing.JButton btnPromo;
     private javax.swing.JLabel lblLogo;
-    private javax.swing.JLabel lblMenuLogout;
-    private javax.swing.JLabel lblMenuPelanggan;
-    private javax.swing.JLabel lblMenuPengiriman;
-    private javax.swing.JLabel lblMenuPesanan;
-    private javax.swing.JLabel lblMenuProduk;
-    private javax.swing.JLabel lblMenuPromo;
-    private javax.swing.JLabel lblRuang;
-    private javax.swing.JLabel lblVersi;
-    private javax.swing.JPanel pnlKanan;
-    private javax.swing.JPanel pnlPenutup;
-    private javax.swing.JPanel pnlSidebar;
-    private javax.swing.JPanel pnlTopbar;
-    private javax.swing.JPanel pnlWadah;
+    private javax.swing.JLabel lblLokasi;
+    private javax.swing.JLabel lblMenu;
+    private javax.swing.JLabel lblNamaAdmin;
+    private javax.swing.JPanel pnlAtas;
+    private javax.swing.JPanel pnlHalaman;
+    private javax.swing.JPanel pnlSamping;
+    private javax.swing.JPanel pnlSisa;
+    private javax.swing.JPanel pnlUtama;
+    private javax.swing.JSeparator sepLogout;
     // End of variables declaration//GEN-END:variables
 }

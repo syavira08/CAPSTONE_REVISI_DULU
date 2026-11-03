@@ -18,10 +18,14 @@ public class AuthController {
 
     /** Login lalu kembalikan pengguna (Admin / Pelanggan) untuk menentukan menu yang dibuka. */
     public Pengguna login(String username, String password) {
+        Map<String, String> salah = new LinkedHashMap<>();
+        if (username.isBlank()) salah.put("username", "Username wajib diisi.");
+        if (password.isEmpty()) salah.put("password", "Password wajib diisi.");
+        ValidasiException.cek(salah);
         Pengguna p = dao.login(username.trim(), password);
         if (p == null) {
-            throw new ValidasiException("Maaf login gagal",
-                    Map.of("password", "Periksa kembali username dan password Anda."));
+            throw new ValidasiException("Username atau password salah.",
+                    Map.of("password", "Username atau password salah."));
         }
         penggunaLogin = p;
         return p;
@@ -32,7 +36,7 @@ public class AuthController {
                                 String password, String konfirmasi) {
         Map<String, String> salah = periksaData(nama, username, telepon, alamat, 0);
         if (password.length() < 8) salah.put("password", "Minimal 8 karakter.");
-        if (!password.equals(konfirmasi)) salah.put("konfirmasi", "Konfirmasi password tidak sama.");
+        if (!password.equals(konfirmasi)) salah.put("konfirmasi", "Password tidak sama.");
         ValidasiException.cek(salah);
 
         Pelanggan baru = new Pelanggan(0, nama.trim(), username.trim(), password, alamat.trim(), telepon.trim(), null);
@@ -49,7 +53,7 @@ public class AuthController {
         Map<String, String> salah = new LinkedHashMap<>();
         if (nama.isBlank()) salah.put("nama", "Nama lengkap wajib diisi.");
         if (!username.trim().matches("[A-Za-z0-9_.]{4,50}")) {
-            salah.put("username", "Username 4-50 karakter (huruf, angka, titik, _).");
+            salah.put("username", "4-50 huruf/angka tanpa spasi.");
         } else {
             Pengguna lain = new PenggunaDAO().cariUsername(username.trim());
             if (lain != null && lain.getId() != idSendiri) salah.put("username", "Username sudah digunakan.");

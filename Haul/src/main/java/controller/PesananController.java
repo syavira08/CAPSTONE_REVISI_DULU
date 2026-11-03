@@ -1,28 +1,33 @@
 package controller;
 
 import config.Konfigurasi;
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
-import java.util.LinkedHashMap;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import model.Pelanggan;
 import model.Pesanan;
 import model.PesananDAO;
 import model.Produk;
-import model.ProdukDAOJdbc;
+import model.Promo;
 
 /**
  * Semua alur pesanan:
- *  - Pelanggan : keranjang (tambah/ubah/hapus), checkout, riwayat, batalkan, lacak, konfirmasi diterima.
- *  - Admin     : ubah status pesanan dan kelola pengiriman (nomor resi, estimasi, status).
+ *  - Pelanggan : keranjang, checkout, bayar, riwayat, batalkan, detail pesanan, konfirmasi diterima.
+ *  - Admin     : daftar pesanan, kirim pesanan (nomor resi dibuat otomatis).
+ *
+ * Status berubah otomatis: buat pesanan -> Menunggu Pembayaran, bayar -> Diproses,
+ * dikirim admin -> Dikirim, diterima pelanggan -> Selesai.
  */
 public class PesananController {
 
     private static Pesanan keranjang;   // keranjang milik pelanggan yang sedang login
     private final PesananDAO dao = new PesananDAO();
-    private final ProdukDAOJdbc produkDAO = new ProdukDAOJdbc();
+    private final ProdukController produkController = new ProdukController();
 
     // ======================= KERANJANG =======================
 
@@ -34,50 +39,73 @@ public class PesananController {
         return keranjang;
     }
 
-    /** Flowchart Tambah Produk: periksa stok terbaru di database -> tambahkan. */
-    public void tambahKeKeranjang(int idProduk) {
-        Produk terbaru = produkDAO.cariId(idProduk);
-        jalankan(() -> getKeranjang().tambahItem(terbaru, 1));
+    /**
+     * Flowchart Tambah Produk: ambil stok terbaru -> tambahkan.
+     * Jumlah otomatis dibatasi stok. Mengembalikan jumlah yang benar-benar masuk keranjang.
+     */
+    public int tambahKeKeranjang(int idProduk, int jumlah) {
+        Produk terbaru = produkController.cariId(idProduk);
+        if (terbaru == null) return 0;
+        return getKeranjang().tambahItem(terbaru, jumlah);
     }
 
-    /** Flowchart Ubah Produk: jumlah harus > 0 dan stok cukup. */
+    /** Jumlah barang ini yang sudah ada di keranjang. */
+    public int jumlahDiKeranjang(int idProduk) {
+        return getKeranjang().getItems().stream()
+                .filter(i -> i.getProduk().getId() == idProduk)
+                .mapToInt(Pesanan.Item::getJumlah).sum();
+    }
+
+    /** Flowchart Ubah Produk: jumlah dibatasi 1 sampai stok. */
     public void ubahJumlah(int idProduk, int jumlah) {
-        jalankan(() -> getKeranjang().ubahJumlah(idProduk, jumlah));
+        getKeranjang().ubahJumlah(idProduk, jumlah);
     }
 
     public void hapusDariKeranjang(int idProduk) {
         getKeranjang().hapusItem(idProduk);
     }
 
-    // ======================= CHECKOUT =======================
+    // ======================= CHECKOUT & BAYAR =======================
 
-    /** Flowchart Checkout: keranjang berisi & stok cukup? */
-    public void periksaSebelumCheckout() {
-        if (getKeranjang().getItems().isEmpty()) throw new ValidasiException("Keranjang masih kosong.");
-        for (Pesanan.Item item : getKeranjang().getItems()) {
-            Produk terbaru = produkDAO.cariId(item.getProduk().getId());
-            if (terbaru == null || item.getJumlah() > terbaru.getStok()) {
-                throw new ValidasiException("Stok " + item.getProduk().getNama() + " tidak mencukupi.");
-            }
+    /** Voucher yang bisa dipilih pelanggan saat checkout. */
+    public List<Promo> voucherTersedia() {
+        return new PromoController().promoAktif();
+    }
+
+    /** Pasang voucher ke keranjang (null = tanpa voucher). Syarat minimal barang diperiksa. */
+    public void pakaiVoucher(Promo promo) {
+        getKeranjang().setPromo(null);
+        if (promo != null) {
+            getKeranjang().setPromo(new PromoController().cekVoucher(promo.getKode(),
+                    getKeranjang().getJumlahBarang()));
         }
     }
 
-    /** Pasang voucher ke keranjang (kode kosong = lepas voucher). Potongan dihitung oleh Promo. */
-    public void pakaiVoucher(String kode) {
-        getKeranjang().setPromo(null);
-        getKeranjang().setPromo(new PromoController().cekVoucher(kode, getKeranjang().getJumlahBarang()));
-    }
-
-    /** Flowchart Checkout: konfirmasi -> simpan pesanan, detail pesanan, dan pembayaran. */
+    /** Flowchart Checkout: keranjang berisi & stok cukup -> simpan pesanan, detail, dan pembayaran. */
     public Pesanan checkout(String metodeBayar) {
-        periksaSebelumCheckout();
         Pesanan p = getKeranjang();
+        if (p.getItems().isEmpty()) throw new ValidasiException("Keranjang masih kosong.");
+        if (metodeBayar == null) throw new ValidasiException("Pilih metode pembayaran.");
         p.setMetodeBayar(metodeBayar);
         p.setTotalHarga(p.hitungTotal(Konfigurasi.ONGKOS_KIRIM));
-        p.setTanggal(java.time.LocalDateTime.now());
+        p.setTanggal(LocalDateTime.now());
         jalankan(() -> dao.simpan(p));
         keranjang = null;   // keranjang dikosongkan setelah pesanan tersimpan
         return p;
+    }
+
+    /** Pelanggan memasukkan nominal pembayaran -> status otomatis Diproses. */
+    public void bayar(Pesanan p, String nominal) {
+        BigDecimal nilai = ProdukController.angka(nominal);
+        if (nilai == null || nilai.signum() <= 0) {
+            throw new ValidasiException("Nominal tidak valid", Map.of("nominal", "Masukkan nominal berupa angka."));
+        }
+        try {
+            p.bayar(nilai);
+        } catch (IllegalStateException e) {
+            throw new ValidasiException(e.getMessage(), Map.of("nominal", e.getMessage()));
+        }
+        dao.ubah(p);
     }
 
     // ======================= RIWAYAT (pelanggan) =======================
@@ -90,13 +118,13 @@ public class PesananController {
                 .collect(Collectors.toList());
     }
 
-    /** Flowchart Riwayat: batalkan pesanan (hanya sebelum diproses). Stok dikembalikan. */
+    /** Batalkan pesanan (hanya sebelum dibayar). Stok dikembalikan. */
     public void batalkan(Pesanan p) {
-        if (!p.bisaDibatalkan()) throw new ValidasiException("Pesanan hanya dapat dibatalkan sebelum diproses.");
+        if (!p.bisaDibatalkan()) throw new ValidasiException("Pesanan yang sudah dibayar tidak dapat dibatalkan.");
         dao.hapus(p.getId());
     }
 
-    /** Flowchart Lacak: barang sudah diterima -> status Diterima / Selesai. */
+    /** Barang sudah diterima -> Selesai. */
     public void konfirmasiDiterima(Pesanan p) {
         jalankan(p::konfirmasiDiterima);
         dao.ubah(p);
@@ -113,61 +141,27 @@ public class PesananController {
         return dao.semua().stream()
                 .filter(p -> filter == null || p.getTahap() == filter)
                 .filter(p -> p.getNomor().toLowerCase().contains(k)
-                        || p.getPelanggan().getNama().toLowerCase().contains(k))
-                .collect(Collectors.toList());
-    }
-
-    /** Admin mengubah status: Menunggu Pembayaran -> Diproses -> Dikirim -> Selesai, atau Dibatalkan. */
-    public void ubahStatus(Pesanan p, Pesanan.Tahap tujuan) {
-        if (tujuan == p.getTahap()) throw new ValidasiException("Pilih status yang berbeda dari status saat ini.");
-        switch (tujuan) {
-            case DIPROSES -> jalankan(p::verifikasiPembayaran);
-            case DIKIRIM -> throw new ValidasiException("Isi nomor resi di menu Pengiriman untuk mengirim pesanan.");
-            case SELESAI -> jalankan(p::konfirmasiDiterima);
-            case DIBATALKAN -> {
-                batalkan(p);
-                return;
-            }
-            default -> throw new ValidasiException("Status tidak dapat dikembalikan ke Menunggu Pembayaran.");
-        }
-        dao.ubah(p);
-    }
-
-    // ======================= KELOLA PENGIRIMAN (admin) =======================
-
-    /** Data pengiriman = pesanan yang pembayarannya sudah diverifikasi. filter: null = semua. */
-    public List<Pesanan> daftarPengiriman(String kataKunci, Pesanan.TahapKirim filter) {
-        String k = kataKunci.toLowerCase().trim();
-        return dao.semua().stream()
-                .filter(p -> p.getTahap() != Pesanan.Tahap.MENUNGGU_PEMBAYARAN)
-                .filter(p -> filter == null || p.getTahapKirim() == filter)
-                .filter(p -> p.getNomor().toLowerCase().contains(k)
+                        || p.getPelanggan().getNama().toLowerCase().contains(k)
                         || (p.getNomorResi() != null && p.getNomorResi().toLowerCase().contains(k)))
                 .collect(Collectors.toList());
     }
 
-    /** Simpan nomor resi, estimasi tiba, dan status pengiriman. */
-    public void simpanPengiriman(Pesanan p, String resi, String estimasi, Pesanan.TahapKirim status) {
-        Map<String, String> salah = new LinkedHashMap<>();
-        resi = resi.trim().toUpperCase();
-        LocalDate tanggal = null;
-        if (!resi.matches("[A-Z0-9-]{3,50}")) salah.put("resi", "Nomor resi 3-50 huruf/angka.");
-        else if (dao.resiDipakai(resi, p.getId())) salah.put("resi", "Nomor resi sudah digunakan.");
-        try {
-            tanggal = LocalDate.parse(estimasi.trim(), PromoController.FORMAT_TANGGAL);
-        } catch (DateTimeParseException e) {
-            salah.put("estimasi", "Format dd/mm/yyyy.");
-        }
-        if (status == Pesanan.TahapKirim.SIAP_DIKIRIM) salah.put("status", "Pilih Dalam Pengiriman atau Diterima.");
-        ValidasiException.cek(salah);
-
+    /** Admin mengirim pesanan Diproses: nomor resi & estimasi dibuat otomatis -> Dikirim. */
+    public void kirim(Pesanan p) {
+        String resi;
+        do {
+            resi = buatResi(p);
+        } while (dao.resiDipakai(resi, p.getId()));
         String resiFinal = resi;
-        LocalDate tanggalFinal = tanggal;
-        jalankan(() -> {
-            if (!p.isDiterima()) p.kirim(resiFinal, tanggalFinal);
-            if (status == Pesanan.TahapKirim.DITERIMA && !p.isDiterima()) p.konfirmasiDiterima();
-        });
+        jalankan(() -> p.kirim(resiFinal, LocalDate.now().plusDays(Konfigurasi.ESTIMASI_KIRIM_HARI)));
         dao.ubah(p);
+    }
+
+    /** Nomor resi panjang, mis. HAUL2026110300016-48213 (tanggal + id pesanan + angka acak). */
+    private String buatResi(Pesanan p) {
+        return "HAUL" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
+                + String.format("%05d", p.getId()) + "-"
+                + String.format("%05d", ThreadLocalRandom.current().nextInt(100000));
     }
 
     // ======================= bantuan =======================

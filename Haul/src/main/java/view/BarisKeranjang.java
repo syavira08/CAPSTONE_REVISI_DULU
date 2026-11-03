@@ -1,184 +1,180 @@
 package view;
 
-import java.util.function.IntConsumer;
 import model.Pesanan;
 
-/** Satu baris barang di keranjang: gambar, nama, atur jumlah (− +), hapus, dan subtotal. */
+/** Satu baris barang di keranjang. */
 public class BarisKeranjang extends javax.swing.JPanel {
 
     private final Pesanan.Item item;
-    private final IntConsumer ubahJumlah;
-    private final Runnable hapus;
+    private final KeranjangPanel induk;
 
-    public BarisKeranjang(Pesanan.Item item, IntConsumer ubahJumlah, Runnable hapus) {
+    public BarisKeranjang(Pesanan.Item item, KeranjangPanel induk) {
         this.item = item;
-        this.ubahJumlah = ubahJumlah;
-        this.hapus = hapus;
+        this.induk = induk;
         initComponents();
-        lblGambar.setIcon(new UI.GambarProduk(item.getProduk().getNama(), 90, 70));
+        lblFoto.setIcon(Gaya.foto(item.getProduk().getGambar(), 72, 72));
         lblNama.setText(item.getProduk().getNama());
-        lblMeta.setText(item.getProduk().getKategori() + " • Stok tersedia: " + item.getProduk().getStok());
+        lblHarga.setText(Gaya.rupiah(item.getProduk().getHarga()) + " / barang \u2022 stok " + item.getProduk().getStok());
         lblJumlah.setText(String.valueOf(item.getJumlah()));
-        lblSubNilai.setText(UI.rupiah(item.getSubtotal()));
-        UI.tombol(btnKurang, UI.Jenis.SEKUNDER, true);
-        UI.tombol(btnTambah, UI.Jenis.SEKUNDER, true);
-        UI.tombol(btnHapus, UI.Jenis.SEKUNDER, true);
-        UI.tema(this);
+        lblSubtotal.setText(Gaya.rupiah(item.getSubtotal()));
+        btnTambah.setEnabled(item.getJumlah() < item.getProduk().getStok());   // tidak bisa melebihi stok
     }
 
+    /**
+     * Kode di bawah ini dibuat oleh GUI Form Builder NetBeans (jangan diubah manual).
+     */
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
         java.awt.GridBagConstraints gridBagConstraints;
 
-        lblGambar = new javax.swing.JLabel();
-        pnlTengah = new javax.swing.JPanel();
+        lblFoto = new javax.swing.JLabel();
         lblNama = new javax.swing.JLabel();
-        lblMeta = new javax.swing.JLabel();
-        pnlAksi = new javax.swing.JPanel();
+        lblHarga = new javax.swing.JLabel();
+        pnlJumlah = new javax.swing.JPanel();
         btnKurang = new javax.swing.JButton();
         lblJumlah = new javax.swing.JLabel();
         btnTambah = new javax.swing.JButton();
+        lblSubtotal = new javax.swing.JLabel();
         btnHapus = new javax.swing.JButton();
-        pnlSubtotal = new javax.swing.JPanel();
-        lblSubJudul = new javax.swing.JLabel();
-        lblSubNilai = new javax.swing.JLabel();
 
-        setOpaque(false);
-        setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 0, 0));
-        setLayout(new java.awt.BorderLayout(16, 0));
+        setBackground(new java.awt.Color(255, 255, 255));
+        setBorder(javax.swing.BorderFactory.createCompoundBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(228, 231, 236)), javax.swing.BorderFactory.createEmptyBorder(12, 12, 12, 16)));
+        setLayout(new java.awt.GridBagLayout());
 
-        lblGambar.setFont(new java.awt.Font("Segoe UI", 0, 13));
-        lblGambar.setForeground(new java.awt.Color(23, 43, 77));
-        lblGambar.setText("");
-        lblGambar.setPreferredSize(new java.awt.Dimension(90, 70));
-        add(lblGambar, java.awt.BorderLayout.WEST);
-
-        pnlTengah.setOpaque(false);
-        pnlTengah.setLayout(new java.awt.GridBagLayout());
-        lblNama.setFont(new java.awt.Font("Segoe UI", 1, 16));
-        lblNama.setForeground(new java.awt.Color(23, 43, 77));
-        lblNama.setText("Headphone Bluetooth");
+        lblFoto.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        lblFoto.setForeground(new java.awt.Color(16, 24, 40));
+        lblFoto.setIcon(new javax.swing.ImageIcon(getClass().getResource("/view/ikon/foto_kosong.png"))); // NOI18N
+        lblFoto.setPreferredSize(new java.awt.Dimension(72, 72));
+        lblFoto.setText("");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 0;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        pnlTengah.add(lblNama, gridBagConstraints);
-        lblMeta.setFont(new java.awt.Font("Segoe UI", 0, 11));
-        lblMeta.setForeground(new java.awt.Color(94, 108, 132));
-        lblMeta.setText("Elektronik \u2022 Stok tersedia: 20");
+        gridBagConstraints.gridheight = 2;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(0, 0, 0, 14);
+        add(lblFoto, gridBagConstraints);
+        lblNama.setFont(new java.awt.Font("Segoe UI", 1, 15)); // NOI18N
+        lblNama.setForeground(new java.awt.Color(16, 24, 40));
+        lblNama.setText("Nama produk");
         gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(6, 0, 0, 0);
-        pnlTengah.add(lblMeta, gridBagConstraints);
-        pnlAksi.setOpaque(false);
-        pnlAksi.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 6, 0));
-        btnKurang.setBackground(new java.awt.Color(255, 255, 255));
-        btnKurang.setFont(new java.awt.Font("Segoe UI", 1, 13));
-        btnKurang.setForeground(new java.awt.Color(23, 43, 77));
-        btnKurang.setText("\u2212");
-        btnKurang.setFocusPainted(false);
-        btnKurang.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnKurangActionPerformed(evt);
-            }
-        });
-        pnlAksi.add(btnKurang);
-        lblJumlah.setFont(new java.awt.Font("Segoe UI", 1, 13));
-        lblJumlah.setForeground(new java.awt.Color(23, 43, 77));
-        lblJumlah.setText("1");
-        lblJumlah.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        lblJumlah.setPreferredSize(new java.awt.Dimension(34, 20));
-        pnlAksi.add(lblJumlah);
-        btnTambah.setBackground(new java.awt.Color(255, 255, 255));
-        btnTambah.setFont(new java.awt.Font("Segoe UI", 1, 13));
-        btnTambah.setForeground(new java.awt.Color(23, 43, 77));
-        btnTambah.setText("+");
-        btnTambah.setFocusPainted(false);
-        btnTambah.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnTambahActionPerformed(evt);
-            }
-        });
-        pnlAksi.add(btnTambah);
-        btnHapus.setBackground(new java.awt.Color(255, 255, 255));
-        btnHapus.setFont(new java.awt.Font("Segoe UI", 1, 13));
-        btnHapus.setForeground(new java.awt.Color(23, 43, 77));
-        btnHapus.setText("Hapus");
-        btnHapus.setFocusPainted(false);
-        btnHapus.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnHapusActionPerformed(evt);
-            }
-        });
-        pnlAksi.add(btnHapus);
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 2;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(6, 0, 0, 0);
-        pnlTengah.add(pnlAksi, gridBagConstraints);
-        add(pnlTengah, java.awt.BorderLayout.CENTER);
-
-        pnlSubtotal.setOpaque(false);
-        pnlSubtotal.setLayout(new java.awt.GridBagLayout());
-        lblSubJudul.setFont(new java.awt.Font("Segoe UI", 0, 11));
-        lblSubJudul.setForeground(new java.awt.Color(94, 108, 132));
-        lblSubJudul.setText("Subtotal");
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridx = 1;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.SOUTHWEST;
         gridBagConstraints.weightx = 1.0;
-        pnlSubtotal.add(lblSubJudul, gridBagConstraints);
-        lblSubNilai.setFont(new java.awt.Font("Segoe UI", 1, 13));
-        lblSubNilai.setForeground(new java.awt.Color(23, 43, 77));
-        lblSubNilai.setText("Rp350.000");
+        add(lblNama, gridBagConstraints);
+        lblHarga.setFont(new java.awt.Font("Segoe UI", 0, 12)); // NOI18N
+        lblHarga.setForeground(new java.awt.Color(102, 112, 133));
+        lblHarga.setText("Rp0 / barang");
         gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridx = 1;
         gridBagConstraints.gridy = 1;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
         gridBagConstraints.weightx = 1.0;
         gridBagConstraints.insets = new java.awt.Insets(4, 0, 0, 0);
-        pnlSubtotal.add(lblSubNilai, gridBagConstraints);
-        add(pnlSubtotal, java.awt.BorderLayout.EAST);
+        add(lblHarga, gridBagConstraints);
+        pnlJumlah.setBackground(new java.awt.Color(255, 255, 255));
+        pnlJumlah.setOpaque(false);
+        pnlJumlah.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0));
+        btnKurang.setBackground(new java.awt.Color(255, 255, 255));
+        btnKurang.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(228, 231, 236)));
+        btnKurang.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnKurang.setFocusPainted(false);
+        btnKurang.setFont(new java.awt.Font("Segoe UI", 1, 15)); // NOI18N
+        btnKurang.setForeground(new java.awt.Color(16, 24, 40));
+        btnKurang.setPreferredSize(new java.awt.Dimension(34, 34));
+        btnKurang.setText("\u2212");
+        btnKurang.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnKurangActionPerformed(evt);
+            }
+        });
+        pnlJumlah.add(btnKurang);
+        lblJumlah.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblJumlah.setForeground(new java.awt.Color(16, 24, 40));
+        lblJumlah.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        lblJumlah.setPreferredSize(new java.awt.Dimension(44, 34));
+        lblJumlah.setText("1");
+        pnlJumlah.add(lblJumlah);
+        btnTambah.setBackground(new java.awt.Color(255, 255, 255));
+        btnTambah.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(228, 231, 236)));
+        btnTambah.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnTambah.setFocusPainted(false);
+        btnTambah.setFont(new java.awt.Font("Segoe UI", 1, 15)); // NOI18N
+        btnTambah.setForeground(new java.awt.Color(16, 24, 40));
+        btnTambah.setPreferredSize(new java.awt.Dimension(34, 34));
+        btnTambah.setText("+");
+        btnTambah.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnTambahActionPerformed(evt);
+            }
+        });
+        pnlJumlah.add(btnTambah);
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 2;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.gridheight = 2;
+        gridBagConstraints.insets = new java.awt.Insets(0, 16, 0, 0);
+        add(pnlJumlah, gridBagConstraints);
+
+        lblSubtotal.setFont(new java.awt.Font("Segoe UI", 1, 15)); // NOI18N
+        lblSubtotal.setForeground(new java.awt.Color(16, 24, 40));
+        lblSubtotal.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
+        lblSubtotal.setPreferredSize(new java.awt.Dimension(130, 24));
+        lblSubtotal.setText("Rp0");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 3;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.gridheight = 2;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(0, 16, 0, 0);
+        add(lblSubtotal, gridBagConstraints);
+        btnHapus.setBackground(new java.awt.Color(253, 236, 236));
+        btnHapus.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 16, 0, 16));
+        btnHapus.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnHapus.setFocusPainted(false);
+        btnHapus.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnHapus.setForeground(new java.awt.Color(217, 45, 32));
+        btnHapus.setPreferredSize(new java.awt.Dimension(80, 34));
+        btnHapus.setText("Hapus");
+        btnHapus.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnHapusActionPerformed(evt);
+            }
+        });
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 4;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.gridheight = 2;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(0, 16, 0, 0);
+        add(btnHapus, gridBagConstraints);
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnKurangActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnKurangActionPerformed
-        ubahJumlah.accept(item.getJumlah() - 1);
+        induk.ubahJumlah(item, item.getJumlah() - 1);
     }//GEN-LAST:event_btnKurangActionPerformed
 
     private void btnTambahActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnTambahActionPerformed
-        ubahJumlah.accept(item.getJumlah() + 1);
+        induk.ubahJumlah(item, item.getJumlah() + 1);
     }//GEN-LAST:event_btnTambahActionPerformed
 
     private void btnHapusActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnHapusActionPerformed
-        hapus.run();
+        induk.hapus(item);
     }//GEN-LAST:event_btnHapusActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnHapus;
     private javax.swing.JButton btnKurang;
     private javax.swing.JButton btnTambah;
-    private javax.swing.JLabel lblGambar;
+    private javax.swing.JLabel lblFoto;
+    private javax.swing.JLabel lblHarga;
     private javax.swing.JLabel lblJumlah;
-    private javax.swing.JLabel lblMeta;
     private javax.swing.JLabel lblNama;
-    private javax.swing.JLabel lblSubJudul;
-    private javax.swing.JLabel lblSubNilai;
-    private javax.swing.JPanel pnlAksi;
-    private javax.swing.JPanel pnlSubtotal;
-    private javax.swing.JPanel pnlTengah;
+    private javax.swing.JLabel lblSubtotal;
+    private javax.swing.JPanel pnlJumlah;
     // End of variables declaration//GEN-END:variables
 }

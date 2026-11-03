@@ -29,7 +29,7 @@ public class ValidasiException extends RuntimeException {
     /** Lempar jika ada pesan error yang terkumpul. */
     public static void cek(Map<String, String> pesanField) {
         if (!pesanField.isEmpty()) {
-            throw new ValidasiException("Terdapat Kesalahan Input", pesanField);
+            throw new ValidasiException("Periksa kembali data yang diisi.", pesanField);
         }
     }
 }

@@ -1,14 +1,14 @@
 package view;
 
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.FlowLayout;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Function;
-import java.util.function.IntPredicate;
+import java.awt.Font;
+import java.util.EventObject;
+import java.util.Set;
 import javax.swing.AbstractCellEditor;
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.SwingUtilities;
@@ -16,82 +16,88 @@ import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 
 /**
- * Helper tabel: kolom "Aksi" berisi tombol per baris (Ubah, Hapus, Lacak, ...).
- * Hanya renderer + editor sel; tampilan tabelnya sendiri dibuat di Form Builder.
+ * Utilitas tabel (renderer + editor): kolom "Aksi" berisi tombol yang bisa berbeda per baris,
+ * mis. Bayar + Batalkan, Lacak, atau Lihat.
  */
 public class KolomAksi extends AbstractCellEditor implements TableCellRenderer, TableCellEditor {
 
-    /** Aksi yang dijalankan saat tombol diklik; baris = indeks baris pada tabel. */
-    public interface Aksi { void jalankan(int baris); }
-
-    /** Definisi satu tombol: teks & jenis (boleh berbeda tiap baris), kapan tampil, dan aksinya. */
-    public static class Tombol {
-        final Function<Integer, String> teks;
-        final Function<Integer, UI.Jenis> jenis;
-        final IntPredicate tampil;
-        final Aksi aksi;
-
-        public Tombol(String teks, UI.Jenis jenis, IntPredicate tampil, Aksi aksi) {
-            this(b -> teks, b -> jenis, tampil, aksi);
-        }
-
-        public Tombol(Function<Integer, String> teks, Function<Integer, UI.Jenis> jenis, IntPredicate tampil, Aksi aksi) {
-            this.teks = teks;
-            this.jenis = jenis;
-            this.tampil = tampil;
-            this.aksi = aksi;
-        }
+    /** Tombol apa saja yang muncul pada baris tertentu. */
+    public interface Tombol {
+        String[] untuk(int baris);
     }
 
-    private final List<Tombol> daftar = new ArrayList<>();
-
-    public KolomAksi(JTable tabel, int kolom, Tombol... tombol) {
-        for (Tombol t : tombol) daftar.add(t);
-        tabel.getColumnModel().getColumn(kolom).setCellRenderer(this);
-        tabel.getColumnModel().getColumn(kolom).setCellEditor(this);
+    /** Dijalankan ketika tombol diklik. */
+    public interface Aksi {
+        void klik(int baris, String tombol);
     }
 
-    private JPanel bangun(int baris, boolean aktif) {
-        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 7));
-        p.setOpaque(true);
-        boolean ada = false;
-        for (Tombol t : daftar) {
-            if (!t.tampil.test(baris)) continue;
-            ada = true;
-            JButton b = new JButton(t.teks.apply(baris));
-            UI.tombol(b, t.jenis.apply(baris), true);
+    private static final Set<String> MERAH = Set.of("Hapus", "Batalkan");
+    private static final Set<String> BIRU = Set.of("Bayar", "Kirim", "Lacak");
+
+    private final Tombol tombol;
+    private final Aksi aksi;
+
+    private KolomAksi(Tombol tombol, Aksi aksi) {
+        this.tombol = tombol;
+        this.aksi = aksi;
+    }
+
+    public static void pasang(JTable tabel, int kolom, Tombol tombol, Aksi aksi) {
+        KolomAksi k = new KolomAksi(tombol, aksi);
+        tabel.getColumnModel().getColumn(kolom).setCellRenderer(k);
+        tabel.getColumnModel().getColumn(kolom).setCellEditor(k);
+    }
+
+    @Override
+    public Component getTableCellRendererComponent(JTable t, Object v, boolean pilih, boolean fokus, int baris, int kolom) {
+        return panel(t, baris, pilih, false);
+    }
+
+    @Override
+    public Component getTableCellEditorComponent(JTable t, Object v, boolean pilih, int baris, int kolom) {
+        return panel(t, baris, true, true);
+    }
+
+    @Override
+    public Object getCellEditorValue() {
+        return "";
+    }
+
+    @Override
+    public boolean isCellEditable(EventObject e) {
+        return true;
+    }
+
+    private JPanel panel(JTable t, int baris, boolean pilih, boolean aktif) {
+        int jarakAtas = Math.max(0, (t.getRowHeight() - 28) / 2);
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, jarakAtas));
+        p.setBackground(pilih ? t.getSelectionBackground() : t.getBackground());
+        for (String label : tombol.untuk(baris)) {
+            JButton b = new JButton(label);
+            b.setFont(t.getFont().deriveFont(Font.BOLD, 12f));
+            b.setFocusPainted(false);
+            b.setPreferredSize(new java.awt.Dimension(Math.max(64, b.getFontMetrics(b.getFont()).stringWidth(label) + 26), 28));
+            if (MERAH.contains(label)) {
+                b.setBackground(new Color(253, 236, 236));
+                b.setForeground(Gaya.MERAH);
+                b.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
+            } else if (BIRU.contains(label)) {
+                b.setBackground(Gaya.BIRU);
+                b.setForeground(Color.WHITE);
+                b.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
+            } else {
+                b.setBackground(Color.WHITE);
+                b.setForeground(Gaya.TEKS);
+                b.setBorder(BorderFactory.createLineBorder(Gaya.GARIS));
+            }
             if (aktif) {
                 b.addActionListener(e -> {
                     fireEditingStopped();
-                    SwingUtilities.invokeLater(() -> t.aksi.jalankan(baris));
+                    SwingUtilities.invokeLater(() -> aksi.klik(baris, label));
                 });
             }
             p.add(b);
         }
-        if (!ada) {
-            JLabel strip = new JLabel("\u2014");
-            strip.setFont(UI.KECIL);
-            strip.setForeground(UI.PUDAR);
-            strip.setBorder(javax.swing.BorderFactory.createEmptyBorder(8, 6, 0, 0));
-            p.add(strip);
-        }
         return p;
     }
-
-    @Override
-    public Component getTableCellRendererComponent(JTable t, Object v, boolean s, boolean f, int r, int c) {
-        JPanel p = bangun(r, false);
-        p.setBackground(s ? UI.BIRU_MUDA : r % 2 == 0 ? UI.PUTIH : UI.BARIS_GANJIL);
-        return p;
-    }
-
-    @Override
-    public Component getTableCellEditorComponent(JTable t, Object v, boolean s, int r, int c) {
-        JPanel p = bangun(r, true);
-        p.setBackground(UI.BIRU_MUDA);
-        return p;
-    }
-
-    @Override
-    public Object getCellEditorValue() { return ""; }
 }

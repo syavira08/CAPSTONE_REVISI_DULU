@@ -16,22 +16,16 @@ import java.util.stream.Collectors;
  */
 public class Pesanan {
 
-    /** Tahap pesanan yang tampil di layar. "Diproses" = belum dikirim tetapi pembayaran sudah LUNAS. */
+    /**
+     * Tahap pesanan yang tampil di layar. Berubah otomatis:
+     * buat pesanan -> Menunggu Pembayaran, pelanggan bayar -> Diproses,
+     * admin kirim -> Dikirim, pelanggan terima -> Selesai.
+     */
     public enum Tahap {
-        MENUNGGU_PEMBAYARAN("Menunggu Pembayaran"), DIPROSES("Diproses"), DIKIRIM("Dikirim"),
-        SELESAI("Selesai"), DIBATALKAN("Dibatalkan");
+        MENUNGGU_PEMBAYARAN("Menunggu Pembayaran"), DIPROSES("Diproses"), DIKIRIM("Dikirim"), SELESAI("Selesai");
 
         private final String label;
         Tahap(String label) { this.label = label; }
-        @Override public String toString() { return label; }
-    }
-
-    /** Tahap pengiriman. "Siap Dikirim" = sudah diproses tetapi belum ada nomor resi. */
-    public enum TahapKirim {
-        SIAP_DIKIRIM("Siap Dikirim"), DALAM_PENGIRIMAN("Dalam Pengiriman"), DITERIMA("Diterima");
-
-        private final String label;
-        TahapKirim(String label) { this.label = label; }
         @Override public String toString() { return label; }
     }
 
@@ -73,25 +67,24 @@ public class Pesanan {
 
     // =============== aturan keranjang ===============
 
-    /** Tambah barang; jika sudah ada, jumlahnya ditambah. Stok diperiksa. */
-    public void tambahItem(Produk produk, int jumlah) {
+    /**
+     * Tambah barang; jika sudah ada, jumlahnya ditambah.
+     * Jumlah otomatis dibatasi sesuai stok. Mengembalikan jumlah yang benar-benar ditambahkan.
+     */
+    public int tambahItem(Produk produk, int jumlah) {
         Item ada = cariItem(produk.getId());
-        int total = (ada == null ? 0 : ada.jumlah) + jumlah;
-        if (total > produk.getStok()) {
-            throw new IllegalStateException("Stok tidak mencukupi. Tersedia " + produk.getStok() + " unit.");
-        }
-        if (ada == null) items.add(new Item(produk, jumlah));
-        else ada.jumlah = total;
+        int sekarang = ada == null ? 0 : ada.jumlah;
+        int baru = Math.min(sekarang + jumlah, produk.getStok());
+        if (baru <= sekarang) return 0;
+        if (ada == null) items.add(new Item(produk, baru));
+        else ada.jumlah = baru;
+        return baru - sekarang;
     }
 
-    /** Ubah jumlah barang: harus lebih dari 0 dan tidak melebihi stok. */
+    /** Ubah jumlah barang: dibatasi antara 1 dan stok. */
     public void ubahJumlah(int idProduk, int jumlahBaru) {
         Item item = cariItem(idProduk);
-        if (jumlahBaru <= 0) throw new IllegalStateException("Jumlah harus lebih dari 0.");
-        if (jumlahBaru > item.produk.getStok()) {
-            throw new IllegalStateException("Stok tidak mencukupi. Tersedia " + item.produk.getStok() + " unit.");
-        }
-        item.jumlah = jumlahBaru;
+        if (item != null) item.jumlah = Math.max(1, Math.min(jumlahBaru, item.produk.getStok()));
     }
 
     public void hapusItem(int idProduk) {
@@ -128,36 +121,26 @@ public class Pesanan {
         return lunas ? Tahap.DIPROSES : Tahap.MENUNGGU_PEMBAYARAN;
     }
 
-    public TahapKirim getTahapKirim() {
-        if (diterima || status.equals("SELESAI")) return TahapKirim.DITERIMA;
-        if (nomorResi != null || status.equals("DIKIRIM")) return TahapKirim.DALAM_PENGIRIMAN;
-        return TahapKirim.SIAP_DIKIRIM;
-    }
-
-    /** Admin memverifikasi pembayaran -> tahap Diproses. */
-    public void verifikasiPembayaran() {
-        if (getTahap() != Tahap.MENUNGGU_PEMBAYARAN) {
-            throw new IllegalStateException("Hanya pesanan Menunggu Pembayaran yang bisa diverifikasi.");
+    /** Pelanggan membayar: nominal harus sama dengan total tagihan -> otomatis Diproses. */
+    public void bayar(BigDecimal nominal) {
+        if (getTahap() != Tahap.MENUNGGU_PEMBAYARAN) throw new IllegalStateException("Pesanan ini sudah dibayar.");
+        if (nominal == null || nominal.compareTo(totalHarga) != 0) {
+            throw new IllegalStateException("Nominal harus sama dengan total tagihan.");
         }
         lunas = true;
     }
 
-    /** Admin mencatat nomor resi & estimasi -> tahap Dikirim. */
+    /** Admin mengirim pesanan yang sudah dibayar -> otomatis Dikirim. */
     public void kirim(String resi, LocalDate estimasi) {
-        if (getTahap() == Tahap.MENUNGGU_PEMBAYARAN) {
-            throw new IllegalStateException("Pembayaran belum diverifikasi, pesanan belum bisa dikirim.");
-        }
-        if (getTahap() == Tahap.SELESAI) throw new IllegalStateException("Pesanan sudah selesai.");
+        if (getTahap() != Tahap.DIPROSES) throw new IllegalStateException("Hanya pesanan Diproses yang bisa dikirim.");
         nomorResi = resi;
         estimasiTiba = estimasi;
         status = "DIKIRIM";
     }
 
-    /** Barang diterima -> tahap Selesai. */
+    /** Pelanggan menerima barang -> otomatis Selesai. */
     public void konfirmasiDiterima() {
-        if (getTahap() != Tahap.DIKIRIM || nomorResi == null) {
-            throw new IllegalStateException("Pesanan belum dikirim atau belum memiliki nomor resi.");
-        }
+        if (getTahap() != Tahap.DIKIRIM) throw new IllegalStateException("Pesanan belum dikirim.");
         diterima = true;
         tanggalDiterima = LocalDateTime.now();
         status = "SELESAI";

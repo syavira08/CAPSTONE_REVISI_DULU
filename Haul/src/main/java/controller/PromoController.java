@@ -18,18 +18,17 @@ public class PromoController {
 
     private final PromoDAO dao = new PromoDAO();
 
-    /** @param status "Semua promo", "Aktif", "Terjadwal", atau "Berakhir" */
-    public List<Promo> cari(String kataKunci, String status) {
+    /** Cari promo berdasarkan kode voucher. */
+    public List<Promo> cari(String kataKunci) {
         String k = kataKunci.toUpperCase().trim();
         return dao.semua().stream()
                 .filter(p -> p.getKode().toUpperCase().contains(k))
-                .filter(p -> status.startsWith("Semua") || p.getStatus().equals(status))
                 .collect(Collectors.toList());
     }
 
-    /** Promo aktif pertama untuk banner di katalog (boleh null). */
-    public Promo promoAktif() {
-        return dao.semua().stream().filter(p -> p.getStatus().equals("Aktif")).findFirst().orElse(null);
+    /** Promo yang sedang berlaku: ditampilkan di Beranda dan bisa dipilih saat checkout. */
+    public List<Promo> promoAktif() {
+        return dao.semua().stream().filter(p -> p.getStatus().equals("Aktif")).collect(Collectors.toList());
     }
 
     /** Tambah (id = 0) atau ubah promo. jenis: 'P' persen / 'N' nominal. */
@@ -41,17 +40,22 @@ public class PromoController {
             Promo lain = dao.cariKode(kode);
             if (lain != null && lain.getId() != id) salah.put("kode", "Kode voucher sudah digunakan.");
         }
+        if (jenis != 'P' && jenis != 'N') salah.put("jenis", "Pilih jenis potongan.");
         BigDecimal nilai = ProdukController.angka(diskon);
-        if (nilai == null || nilai.signum() <= 0) salah.put("diskon", "Potongan harus lebih dari 0.");
-        else if (jenis == 'P' && nilai.intValue() > 100) salah.put("diskon", "Potongan persen maksimal 100.");
+        if (nilai == null || nilai.signum() <= 0) salah.put("diskon", "Potongan harus berupa angka lebih dari 0.");
+        else if (jenis == 'P' && nilai.compareTo(BigDecimal.valueOf(90)) > 0) salah.put("diskon", "Potongan persen maksimal 90%.");
+        else if (jenis == 'N' && nilai.compareTo(BigDecimal.valueOf(1000)) < 0) salah.put("diskon", "Potongan nominal minimal Rp1.000.");
+        else if (jenis == 'N' && nilai.compareTo(BigDecimal.valueOf(5_000_000)) > 0) salah.put("diskon", "Potongan nominal maksimal Rp5.000.000.");
         BigDecimal min = ProdukController.angka(minimal);
-        if (min == null || min.intValue() < 1) salah.put("minimal", "Minimal 1 barang.");
+        if (min == null || min.intValue() < 1 || min.intValue() > 100) salah.put("minimal", "Isi 1 sampai 100 barang.");
         LocalDate tglMulai = tanggal(mulai);
         LocalDate tglSelesai = tanggal(selesai);
-        if (tglMulai == null) salah.put("mulai", "Format dd/mm/yyyy.");
-        if (tglSelesai == null) salah.put("selesai", "Format dd/mm/yyyy.");
+        if (tglMulai == null) salah.put("mulai", "Format tanggal dd/mm/yyyy.");
+        if (tglSelesai == null) salah.put("selesai", "Format tanggal dd/mm/yyyy.");
         else if (tglMulai != null && tglSelesai.isBefore(tglMulai)) {
-            salah.put("selesai", "Tidak boleh mendahului tanggal mulai.");
+            salah.put("selesai", "Tidak boleh sebelum tanggal mulai.");
+        } else if (id == 0 && tglSelesai.isBefore(LocalDate.now())) {
+            salah.put("selesai", "Promo baru tidak boleh sudah berakhir.");
         }
         ValidasiException.cek(salah);
 

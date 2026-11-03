@@ -1,15 +1,15 @@
 package main;
 
 import javax.swing.SwingUtilities;
+import view.Gaya;
 import view.LoginView;
-import view.UI;
 
 /** Titik awal aplikasi HAULECTRA. */
 public class MainApp {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            UI.pasangTema();
+            Gaya.pasangTema();
             new LoginView().setVisible(true);
         });
     }
